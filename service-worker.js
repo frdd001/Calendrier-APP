@@ -115,7 +115,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('Gestion Photobooth', options)
+    self.registration.showNotification('Calendri-booth', options)
   );
 });
 
