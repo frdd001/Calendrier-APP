@@ -1,6 +1,6 @@
 {
-  "name": "Gestion Photobooth",
-  "short_name": "Photobooth",
+  "name": "Calendri-booth",
+  "short_name": "Calendri-booth",
   "description": "Application de gestion de location de photobooths",
   "start_url": "/",
   "display": "standalone",
