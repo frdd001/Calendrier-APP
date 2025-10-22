@@ -20,12 +20,12 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // Configuration Google Drive API
+    // ⚠️ REMPLACEZ ICI VOS CLÉS GOOGLE
     const CLIENT_ID = '362970811261-iemtpn2m017af2ja4qsqjsjbkou59cje.apps.googleusercontent.com';
     const API_KEY = 'AIzaSyB7UaolNFtg__7qweEzNiwr40c4Gk13lQ8';
     const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
     const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
- 
+
     function PhotoboothManager() {
       const [view, setView] = useState('calendar');
       const [currentDate, setCurrentDate] = useState(new Date());
@@ -46,19 +46,19 @@
       const [showNotifications, setShowNotifications] = useState(false);
       const [notificationSettings, setNotificationSettings] = useState({
         telegram: { enabled: false, botToken: '', chatId: '' },
-        email: { enabled: false, address: '' },
+											   
         weeklyReminder: true,
         dailyReminder: true,
         urgentAlerts: true,
-        stockAlerts: true,
-        maintenanceReminder: true
+        stockAlerts: true
+								 
       });
       const [isGapiLoaded, setIsGapiLoaded] = useState(false);
       const [isSignedIn, setIsSignedIn] = useState(false);
       const [lastBackup, setLastBackup] = useState(null);
       const [backupStatus, setBackupStatus] = useState('idle');
 
-      // Initialiser Google API
+							   
       useEffect(() => {
         const initGapi = () => {
           if (typeof gapi !== 'undefined') {
@@ -93,7 +93,7 @@
         return () => window.removeEventListener('load', initGapi);
       }, []);
 
-      // Connexion Google Drive
+							   
       const handleGoogleSignIn = () => {
         if (isGapiLoaded) {
           gapi.auth2.getAuthInstance().signIn();
@@ -106,7 +106,7 @@
         }
       };
 
-      // Sauvegarder sur Google Drive
+									 
       const saveToDrive = async () => {
         if (!isSignedIn) {
           alert('Connectez-vous à Google Drive pour sauvegarder');
@@ -128,7 +128,7 @@
         };
 
         try {
-          // Chercher si un fichier backup existe
+												 
           const response = await gapi.client.drive.files.list({
             spaces: 'appDataFolder',
             fields: 'files(id, name)',
@@ -188,7 +188,7 @@
         }
       };
 
-      // Charger depuis Google Drive
+									
       const loadFromDrive = async () => {
         if (!isSignedIn) return;
 
@@ -221,12 +221,12 @@
           }
         } catch (error) {
           console.error('Erreur chargement Drive:', error);
-          // Charger depuis localStorage en fallback
+													
           loadFromLocalStorage();
         }
       };
 
-      // Charger depuis localStorage
+									
       const loadFromLocalStorage = () => {
         const savedBornes = localStorage.getItem('bornes');
         const savedForfaits = localStorage.getItem('forfaits');
@@ -247,14 +247,14 @@
         if (savedNotificationSettings) setNotificationSettings(JSON.parse(savedNotificationSettings));
       };
 
-      // Charger les données au démarrage
+										   
       useEffect(() => {
         if (!isSignedIn) {
           loadFromLocalStorage();
         }
       }, []);
 
-      // Sauvegarder dans localStorage
+									  
       useEffect(() => {
         localStorage.setItem('bornes', JSON.stringify(bornes));
         localStorage.setItem('forfaits', JSON.stringify(forfaits));
@@ -266,18 +266,18 @@
         localStorage.setItem('notificationSettings', JSON.stringify(notificationSettings));
       }, [bornes, forfaits, reservations, rdvs, bobines, stock, notifications, notificationSettings]);
 
-      // Sauvegarde automatique toutes les 24h
+											  
       useEffect(() => {
         if (!isSignedIn) return;
 
         const autoBackup = setInterval(() => {
           saveToDrive();
-        }, 24 * 60 * 60 * 1000); // 24 heures
+        }, 24 * 60 * 60 * 1000);
 
         return () => clearInterval(autoBackup);
       }, [isSignedIn, bornes, forfaits, reservations, rdvs, bobines, stock]);
 
-      // Fonction pour trouver une bobine disponible
+													
       const findAvailableBobine = (photosNeeded) => {
         const bobinesWithReservations = bobines.map(bobine => {
           const reserved = reservations
@@ -297,7 +297,7 @@
         return bobinesWithReservations.find(b => b.available >= photosNeeded);
       };
 
-      // Dégrever automatiquement les bobines
+											  
       useEffect(() => {
         const today = new Date().toISOString().split('T')[0];
         
@@ -321,7 +321,7 @@
                 )
               );
 
-              addNotification('info', '📦 Bobine dégrevée', `Bobine dégrevée de ${forfait.nbPhotos} photos pour ${res.clientNom}`, 'normal');
+              addNotification('info', '📦 Bobine dégrevée', `Bobine dégrevée de ${forfait.nbPhotos} photos`, 'normal');
             }
           }
         });
@@ -365,76 +365,76 @@
         }
       };
 
-      useEffect(() => {
-        const checkNotifications = () => {
-          const now = new Date();
-          const today = now.toISOString().split('T')[0];
-          const dayOfWeek = now.getDay();
-          const hour = now.getHours();
-          
-          if (notificationSettings.weeklyReminder && dayOfWeek === 1 && hour === 8) {
-            const thisWeek = reservations.filter(r => {
-              const resDate = new Date(r.dateDebut);
-              const weekStart = new Date(now);
-              weekStart.setDate(now.getDate() - now.getDay() + 1);
-              const weekEnd = new Date(weekStart);
-              weekEnd.setDate(weekStart.getDate() + 7);
-              return resDate >= weekStart && resDate < weekEnd;
-            });
-            
-            if (thisWeek.length > 0) {
-              addNotification('info', '📅 Résumé semaine', `${thisWeek.length} location(s) cette semaine`, 'high');
-            }
-          }
-          
-          if (notificationSettings.dailyReminder && hour === 8) {
-            const todayEvents = reservations.filter(r => r.dateDebut === today);
-            const todayRdvs = rdvs.filter(r => r.date === today);
-            
-            if (todayEvents.length > 0 || todayRdvs.length > 0) {
-              addNotification('warning', '⚠️ Aujourd\'hui', `${todayEvents.length} location(s) et ${todayRdvs.length} RDV`, 'high');
-            }
-          }
-          
-          reservations.forEach(res => {
-            const resDate = new Date(res.dateDebut);
-            const diff = (resDate - now) / (1000 * 60 * 60);
-            
-            if (diff > 46 && diff < 50) {
-              addNotification('warning', '⏰ Dans 48h', `Location ${res.clientNom} le ${res.dateDebut}`, 'high');
-            }
-            
-            if (diff > 22 && diff < 26) {
-              addNotification('urgent', '🚨 Demain', `Location ${res.clientNom} demain à ${res.heureDebut}`, 'urgent');
-            }
-          });
-          
-          const urgentThemes = reservations.filter(res => {
-            if (res.themeRealisé || !res.theme) return false;
-            const daysUntil = Math.ceil((new Date(res.dateDebut) - now) / (1000 * 60 * 60 * 24));
-            return daysUntil <= 2 && daysUntil >= 0;
-          });
-          
-          if (urgentThemes.length > 0 && notificationSettings.urgentAlerts) {
-            addNotification('warning', '🎨 Thèmes urgents', `${urgentThemes.length} thème(s) à préparer`, 'high');
-          }
+					   
+										  
+								 
+														
+										 
+									  
+		  
+																					 
+													   
+													
+											  
+																  
+												  
+													   
+															   
+			   
+			
+									  
+																													   
+			 
+		   
+		  
+																 
+																				
+																 
+			
+																 
+																																		
+			 
+		   
+		  
+									   
+													
+															
+			
+										 
+																												  
+			 
+			
+										 
+																														  
+			 
+			 
+		  
+														   
+															  
+																								 
+													
+			 
+		  
+																			 
+																														
+		   
 
-          const lowStock = stock.filter(s => s.quantite <= s.seuilAlerte);
-          if (lowStock.length > 0 && notificationSettings.stockAlerts) {
-            addNotification('warning', '📦 Stock faible', `${lowStock.length} article(s) faible`, 'high');
-          }
+																		  
+																		
+																											
+		   
 
-          const lowBobines = bobines.filter(b => b.photosRestantes < 100);
-          if (lowBobines.length > 0 && notificationSettings.stockAlerts) {
-            addNotification('warning', '🎞️ Bobines faibles', `${lowBobines.length} bobine(s) < 100 photos`, 'high');
-          }
-        };
-        
-        const interval = setInterval(checkNotifications, 60 * 60 * 1000);
-        checkNotifications();
-        
-        return () => clearInterval(interval);
-      }, [reservations, rdvs, stock, bobines, notificationSettings]);
+																		  
+																		  
+																														 
+		   
+		  
+		
+																		 
+							 
+		
+											 
+																	 
 
       const markAsRead = (id) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -508,9 +508,9 @@
             const bobineDisponible = findAvailableBobine(forfait.nbPhotos);
             if (bobineDisponible) {
               finalData.bobineId = bobineDisponible.id;
-              addNotification('info', '✅ Bobine attribuée', `Bobine #${bobineDisponible.numero} (${bobineDisponible.available} dispo)`, 'normal');
+              addNotification('info', '✅ Bobine attribuée', `Bobine #${bobineDisponible.numero} attribuée`, 'normal');
             } else {
-              addNotification('warning', '⚠️ Pas de bobine', `Aucune bobine pour ${forfait.nbPhotos} photos`, 'high');
+              addNotification('warning', '⚠️ Pas de bobine', `Aucune bobine disponible pour ${forfait.nbPhotos} photos`, 'high');
             }
           }
           
@@ -542,7 +542,7 @@
               dateAjout: new Date().toISOString().split('T')[0]
             };
             setBobines([...bobines, newBobine]);
-            addNotification('info', '🎞️ Bobine ajoutée', `Bobine #${formData.numero} (${formData.capacite} photos)`, 'normal');
+																																	 
           }
         }
         setShowAddModal(false);
@@ -586,7 +586,7 @@
         const days = [];
         
         for (let i = 0; i < startingDayOfWeek; i++) {
-          days.push(<div key={`empty-${i}`} className="h-24 bg-gray-50"></div>);
+          days.push(<div key={`empty-${i}`} className="h-20 bg-gray-50"></div>);
         }
         
         for (let day = 1; day <= daysInMonth; day++) {
@@ -596,35 +596,35 @@
           days.push(
             <div
               key={day}
-              className="h-24 border border-gray-200 p-1 bg-white hover:bg-gray-50 cursor-pointer relative"
+              className="h-20 border border-gray-200 p-1 bg-white hover:bg-gray-50 cursor-pointer relative text-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 if (e.target === e.currentTarget || e.target.classList.contains('font-bold')) {
                   const rect = e.currentTarget.getBoundingClientRect();
-                  const x = rect.left + rect.width / 2;
-                  const y = rect.top + rect.height / 2;
+                  const x = Math.min(rect.left + rect.width / 2, window.innerWidth - 200);
+                  const y = Math.min(rect.top + rect.height / 2, window.innerHeight - 120);
                   setShowDateMenu({ day, x, y, date });
                 }
               }}
             >
-              <div className="font-bold text-sm">{day}</div>
+              <div className="font-bold text-xs">{day}</div>
               <div className="text-xs space-y-1 overflow-hidden">
-                {events.slice(0, 2).map((event, idx) => (
+                {events.slice(0, 1).map((event, idx) => (
                   <div
                     key={idx}
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowEventDetail(event);
                     }}
-                    className={`px-1 py-0.5 rounded text-white truncate cursor-pointer hover:opacity-80 ${
+                    className={`px-1 py-0.5 rounded text-white truncate cursor-pointer hover:opacity-80 text-xs ${
                       event.type === 'reservation' ? 'bg-blue-500' : 'bg-green-500'
                     }`}
                   >
                     {event.type === 'reservation' ? '📷' : '📅'} {event.clientNom || event.description}
                   </div>
                 ))}
-                {events.length > 2 && (
-                  <div className="text-xs text-gray-500">+{events.length - 2}</div>
+                {events.length > 1 && (
+                  <div className="text-xs text-gray-500">+{events.length - 1}</div>
                 )}
               </div>
             </div>
@@ -637,77 +637,77 @@
       return (
         <div className="min-h-screen bg-gray-100">
           <div className="sticky top-0 z-30 bg-white shadow-md">
-            <div className="max-w-7xl mx-auto px-4">
-              <div className="flex justify-between items-center py-3">
-                <h1 className="text-xl font-bold text-blue-600">📷 Calendri-Booth</h1>
+            <div className="max-w-7xl mx-auto px-2">
+              <div className="flex justify-between items-center py-2">
+                <h1 className="text-lg font-bold text-blue-600">📷 Calendri-Booth</h1>
                 
-                {/* Boutons Google Drive */}
-                <div className="flex gap-2 items-center">
+											
+                <div className="flex gap-1 items-center text-xs">
                   {isSignedIn ? (
                     <>
                       <button
                         onClick={saveToDrive}
                         disabled={backupStatus === 'saving'}
-                        className={`px-3 py-1 text-sm rounded ${
+                        className={`px-2 py-1 text-xs rounded ${
                           backupStatus === 'saving' ? 'bg-gray-300' :
                           backupStatus === 'success' ? 'bg-green-500 text-white' :
                           backupStatus === 'error' ? 'bg-red-500 text-white' :
                           'bg-blue-500 text-white hover:bg-blue-600'
                         }`}
                       >
-                        {backupStatus === 'saving' ? '💾 Sauvegarde...' :
-                         backupStatus === 'success' ? '✅ Sauvegardé' :
-                         backupStatus === 'error' ? '❌ Erreur' :
-                         '💾 Sauvegarder'}
+                        {backupStatus === 'saving' ? '💾...' :
+                         backupStatus === 'success' ? '✅' :
+                         backupStatus === 'error' ? '❌' :
+                         '💾'}
                       </button>
                       <button
                         onClick={handleGoogleSignOut}
-                        className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+                        className="px-2 py-1 text-xs bg-gray-500 text-white rounded"
                       >
-                        ⏏️ Déconnexion
+                        ⏏️
                       </button>
                     </>
                   ) : (
                     <button
                       onClick={handleGoogleSignIn}
-                      className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded"
                     >
-                      🔐 Connexion Drive
+                      🔐 Drive
                     </button>
                   )}
                 </div>
               </div>
 
-              {lastBackup && (
-                <div className="text-xs text-gray-500 pb-2">
-                  Dernière sauvegarde : {new Date(lastBackup).toLocaleString('fr-FR')}
-                </div>
-              )}
+							  
+															
+																					   
+					  
+				
 
-              <nav className="flex gap-2 border-b border-gray-200 pb-2">
+              <nav className="flex gap-1 border-b border-gray-200 pb-1 text-xs">
                 <button
                   onClick={() => { setView('calendar'); setShowNotifications(false); }}
-                  className={`px-3 py-2 rounded-t-lg transition-colors text-sm ${
-                    view === 'calendar' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  className={`px-2 py-1 rounded-t-lg ${
+                    view === 'calendar' ? 'bg-blue-500 text-white' : 'bg-gray-200'
                   }`}
                 >
-                  📅 Calendrier
+                  📅
                 </button>
                 <button
                   onClick={() => { setView('admin'); setShowNotifications(false); }}
-                  className={`px-3 py-2 rounded-t-lg transition-colors text-sm ${
-                    view === 'admin' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  className={`px-2 py-1 rounded-t-lg ${
+                    view === 'admin' ? 'bg-blue-500 text-white' : 'bg-gray-200'
                   }`}
                 >
-                  ⚙️ Admin
+                  ⚙️
                 </button>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="ml-auto px-3 py-2 rounded-t-lg bg-gray-200 hover:bg-gray-300 relative text-sm"
+                  className="ml-auto px-2 py-1 rounded-t-lg bg-gray-200 relative"
                 >
-                  🔔 Notifications
+                  🔔
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
                       {unreadCount}
                     </span>
                   )}
@@ -716,43 +716,285 @@
             </div>
           </div>
 
-          <div className="max-w-7xl mx-auto p-4">
-            {/* Le reste de l'application reste identique */}
-            <div className="text-center py-20">
-              <h2 className="text-2xl font-bold mb-4">Calendri-Booth PWA</h2>
-              <p className="text-gray-600 mb-4">
-                {isSignedIn 
-                  ? '✅ Connecté à Google Drive - Sauvegarde automatique activée' 
-                  : '⚠️ Connectez-vous à Google Drive pour sauvegarder vos données'}
-              </p>
-              <p className="text-sm text-gray-500">
-                Interface complète du calendrier à intégrer ici
-              </p>
-            </div>
+          <div className="max-w-7xl mx-auto p-2 text-sm">
+            {showNotifications && (
+              <div className="mb-4 bg-white rounded-lg shadow p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-bold">🔔 Notifications</h2>
+                  <button onClick={() => setView('notif-settings')} className="text-blue-500 text-xs">⚙️</button>
+                </div>
+                {notifications.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4 text-sm">Aucune notification</p>
+                ) : (
+                  <div className="space-y-2">
+                    {notifications.slice(0, 5).map(notif => (
+                      <div key={notif.id} className={`p-2 rounded text-xs ${notif.read ? 'opacity-60' : ''}`}>
+                        <div className="flex justify-between">
+                          <span className="font-bold">{notif.title}</span>
+                          <button onClick={() => deleteNotification(notif.id)} className="text-red-500">✕</button>
+                        </div>
+                        <p className="text-xs">{notif.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {view === 'calendar' && (
+              <>
+                <div className="bg-white rounded-lg shadow p-3 mb-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">←</button>
+                    <h2 className="text-sm font-bold">{currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</h2>
+                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">→</button>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-0.5 text-xs">
+                    {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map(day => (
+                      <div key={day} className="text-center font-bold p-1 bg-gray-100 text-xs">{day}</div>
+                    ))}
+                    {renderCalendar()}
+                  </div>
+                </div>
+
+                {themesAPreparer.length > 0 && (
+                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mb-3">
+                    <h2 className="text-sm font-bold mb-2">🎨 Thèmes à préparer</h2>
+                    {themesAPreparer.map(res => (
+                      <div key={res.id} className="bg-white p-2 rounded mb-2 text-xs">
+                        <div className="font-bold">{res.clientNom}</div>
+                        <div>{res.theme}</div>
+                        <button onClick={() => toggleThemeRealise(res.id)} className="mt-1 px-2 py-1 bg-green-500 text-white rounded text-xs">✓ Fait</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button onClick={() => openReservationModal()} className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-sm">📷 Location</button>
+                  <button onClick={() => openRdvModal()} className="flex-1 px-3 py-2 bg-green-500 text-white rounded text-sm">📅 RDV</button>
+                </div>
+              </>
+            )}
+
+            {view === 'admin' && (
+              <div className="space-y-3">
+                <div className="bg-white rounded-lg shadow p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold text-sm">📦 Bornes</h3>
+                    <button onClick={() => { setModalType('borne'); setFormData({ nom: '', modele: '' }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                  </div>
+                  {bornes.map(b => (
+                    <div key={b.id} className="border-b py-1 text-xs flex justify-between">
+                      <span>{b.nom}</span>
+                      <button onClick={() => setConfirmDelete({ type: 'borne', id: b.id })} className="text-red-500">🗑️</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold text-sm">💰 Forfaits</h3>
+                    <button onClick={() => { setModalType('forfait'); setFormData({ nom: '', prix: '', duree: '', nbPhotos: '' }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                  </div>
+                  {forfaits.map(f => (
+                    <div key={f.id} className="border-b py-1 text-xs flex justify-between">
+                      <span>{f.nom} - {f.prix}€ {f.nbPhotos && `(${f.nbPhotos} photos)`}</span>
+                      <button onClick={() => setConfirmDelete({ type: 'forfait', id: f.id })} className="text-red-500">🗑️</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold text-sm">🎞️ Bobines</h3>
+                    <button onClick={() => { setModalType('bobine'); const nextNum = bobines.length > 0 ? Math.max(...bobines.map(b => b.numero)) + 1 : 1; setFormData({ numero: nextNum, capacite: 400 }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                  </div>
+                  {bobines.map(b => (
+                    <div key={b.id} className="border-b py-1 text-xs">
+                      <div className="flex justify-between">
+                        <span>Bobine #{b.numero}</span>
+                        <button onClick={() => setConfirmDelete({ type: 'bobine', id: b.id })} className="text-red-500">🗑️</button>
+                      </div>
+                      <div className="text-xs text-gray-600">{b.photosRestantes} / {b.capacite} photos</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold text-sm">📦 Stock</h3>
+                    <button onClick={() => { setModalType('stock'); setFormData({ nom: '', quantite: 0, seuilAlerte: 0, unite: 'pièces' }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                  </div>
+                  {stock.map(s => (
+                    <div key={s.id} className="border-b py-1 text-xs flex justify-between">
+                      <span>{s.nom}: {s.quantite} {s.unite}</span>
+                      <button onClick={() => setConfirmDelete({ type: 'stock', id: s.id })} className="text-red-500">🗑️</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {view === 'notif-settings' && (
+              <div className="bg-white rounded-lg shadow p-3">
+                <h2 className="text-lg font-bold mb-3">⚙️ Paramètres Telegram</h2>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={notificationSettings.telegram.enabled} onChange={(e) => setNotificationSettings(prev => ({ ...prev, telegram: { ...prev.telegram, enabled: e.target.checked } }))} />
+                    <span>Activer Telegram</span>
+                  </label>
+                  <input type="text" placeholder="Bot Token" value={notificationSettings.telegram.botToken} onChange={(e) => setNotificationSettings(prev => ({ ...prev, telegram: { ...prev.telegram, botToken: e.target.value } }))} className="w-full p-2 border rounded text-sm" />
+                  <input type="text" placeholder="Chat ID" value={notificationSettings.telegram.chatId} onChange={(e) => setNotificationSettings(prev => ({ ...prev, telegram: { ...prev.telegram, chatId: e.target.value } }))} className="w-full p-2 border rounded text-sm" />
+                  <button onClick={() => sendTelegramNotification('Test', '✅ Ça marche !')} className="w-full px-3 py-2 bg-green-500 text-white rounded text-sm">📤 Test</button>
+                  <button onClick={() => setView('calendar')} className="w-full px-3 py-2 bg-blue-500 text-white rounded text-sm">Retour</button>
+                </div>
+              </div>
+            )}
           </div>
+
+          {showDateMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowDateMenu(null)}></div>
+              <div className="fixed z-50 bg-white rounded-lg shadow-xl border p-2 text-sm" style={{ left: showDateMenu.x, top: showDateMenu.y }}>
+                <button onClick={() => openReservationModal(showDateMenu.date)} className="block w-full text-left px-3 py-2 hover:bg-blue-100 rounded whitespace-nowrap text-sm">📷 Nouvelle location</button>
+                <button onClick={() => openRdvModal(showDateMenu.date)} className="block w-full text-left px-3 py-2 hover:bg-green-100 rounded whitespace-nowrap text-sm">📅 Nouveau RDV</button>
+              </div>
+            </>
+          )}
+
+          {showEventDetail && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3">
+              <div className="bg-white rounded-lg p-4 max-w-md w-full max-h-[80vh] overflow-y-auto text-sm">
+                <div className="flex justify-between mb-3">
+                  <h3 className="font-bold text-sm">{showEventDetail.type === 'reservation' ? '📷 Location' : '📅 RDV'}</h3>
+                  <button onClick={() => setShowEventDetail(null)} className="text-xl">✕</button>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div><strong>Client:</strong> {showEventDetail.clientNom}</div>
+                  <div><strong>Tél:</strong> {showEventDetail.clientTel}</div>
+                  {showEventDetail.type === 'reservation' && (
+                    <>
+                      <div><strong>Date:</strong> {showEventDetail.dateDebut} à {showEventDetail.heureDebut}</div>
+                      {showEventDetail.theme && <div><strong>Thème:</strong> {showEventDetail.theme}</div>}
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => { setEditingItem(showEventDetail); setFormData(showEventDetail); setModalType(showEventDetail.type); setShowEventDetail(null); setShowAddModal(true); }} className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-xs">✏️ Modifier</button>
+                  <button onClick={() => { setConfirmDelete({ type: showEventDetail.type, id: showEventDetail.id }); setShowEventDetail(null); }} className="flex-1 px-3 py-2 bg-red-500 text-white rounded text-xs">🗑️ Supprimer</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showAddModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3">
+              <div className="bg-white rounded-lg p-4 max-w-md w-full max-h-[80vh] overflow-y-auto text-sm">
+                <h3 className="font-bold mb-3 text-sm">{editingItem ? 'Modifier' : 'Ajouter'}</h3>
+                
+                {modalType === 'borne' && (
+                  <div className="space-y-2">
+                    <input type="text" placeholder="Nom" value={formData.nom || ''} onChange={(e) => setFormData({ ...formData, nom: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="text" placeholder="Modèle" value={formData.modele || ''} onChange={(e) => setFormData({ ...formData, modele: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                  </div>
+                )}
+
+                {modalType === 'forfait' && (
+                  <div className="space-y-2">
+                    <input type="text" placeholder="Nom" value={formData.nom || ''} onChange={(e) => setFormData({ ...formData, nom: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="number" placeholder="Prix (€)" value={formData.prix || ''} onChange={(e) => setFormData({ ...formData, prix: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="text" placeholder="Durée" value={formData.duree || ''} onChange={(e) => setFormData({ ...formData, duree: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="number" placeholder="Nb photos" value={formData.nbPhotos || ''} onChange={(e) => setFormData({ ...formData, nbPhotos: parseInt(e.target.value) || '' })} className="w-full p-2 border rounded text-sm" />
+                  </div>
+                )}
+
+                {modalType === 'bobine' && (
+                  <div className="space-y-2">
+                    <input type="number" placeholder="Numéro" value={formData.numero || ''} onChange={(e) => setFormData({ ...formData, numero: parseInt(e.target.value) || '' })} className="w-full p-2 border rounded text-sm" />
+                    <input type="number" placeholder="Capacité" value={formData.capacite || ''} onChange={(e) => setFormData({ ...formData, capacite: parseInt(e.target.value) || 400 })} className="w-full p-2 border rounded text-sm" />
+                  </div>
+                )}
+
+                {modalType === 'stock' && (
+                  <div className="space-y-2">
+                    <input type="text" placeholder="Nom" value={formData.nom || ''} onChange={(e) => setFormData({ ...formData, nom: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="number" placeholder="Quantité" value={formData.quantite || ''} onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value) || 0 })} className="w-full p-2 border rounded text-sm" />
+                    <input type="number" placeholder="Seuil" value={formData.seuilAlerte || ''} onChange={(e) => setFormData({ ...formData, seuilAlerte: parseInt(e.target.value) || 0 })} className="w-full p-2 border rounded text-sm" />
+                  </div>
+                )}
+
+                {modalType === 'reservation' && (
+                  <div className="space-y-2">
+                    <select value={formData.borneId || ''} onChange={(e) => setFormData({ ...formData, borneId: e.target.value })} className="w-full p-2 border rounded text-sm">
+                      <option value="">Borne</option>
+                      {bornes.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+                    </select>
+                    <select value={formData.forfaitId || ''} onChange={(e) => setFormData({ ...formData, forfaitId: e.target.value })} className="w-full p-2 border rounded text-sm">
+                      <option value="">Forfait</option>
+                      {forfaits.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
+                    </select>
+                    <input type="text" placeholder="Client" value={formData.clientNom || ''} onChange={(e) => setFormData({ ...formData, clientNom: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="tel" placeholder="Téléphone" value={formData.clientTel || ''} onChange={(e) => setFormData({ ...formData, clientTel: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="date" value={formData.dateDebut || ''} onChange={(e) => setFormData({ ...formData, dateDebut: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="time" value={formData.heureDebut || ''} onChange={(e) => setFormData({ ...formData, heureDebut: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <textarea placeholder="Thème" value={formData.theme || ''} onChange={(e) => setFormData({ ...formData, theme: e.target.value })} className="w-full p-2 border rounded text-sm h-16"></textarea>
+                  </div>
+                )}
+
+                {modalType === 'rdv' && (
+                  <div className="space-y-2">
+                    <input type="date" value={formData.date || ''} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="time" value={formData.heure || ''} onChange={(e) => setFormData({ ...formData, heure: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="text" placeholder="Client" value={formData.clientNom || ''} onChange={(e) => setFormData({ ...formData, clientNom: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="tel" placeholder="Téléphone" value={formData.clientTel || ''} onChange={(e) => setFormData({ ...formData, clientTel: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <textarea placeholder="Description" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full p-2 border rounded text-sm h-16"></textarea>
+                  </div>
+                )}
+
+                <div className="flex gap-2 mt-3">
+                  <button onClick={handleSave} className="flex-1 px-3 py-2 bg-green-500 text-white rounded text-sm">✓ OK</button>
+                  <button onClick={() => setShowAddModal(false)} className="flex-1 px-3 py-2 bg-gray-500 text-white rounded text-sm">✕ Annuler</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {confirmDelete && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3">
+              <div className="bg-white rounded-lg p-4 max-w-sm w-full text-sm">
+                <h3 className="font-bold mb-3">Supprimer ?</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => handleDelete(confirmDelete.type, confirmDelete.id)} className="flex-1 px-3 py-2 bg-red-500 text-white rounded text-sm">Supprimer</button>
+                  <button onClick={() => setConfirmDelete(null)} className="flex-1 px-3 py-2 bg-gray-500 text-white rounded text-sm">Annuler</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
 
-    // Enregistrer le Service Worker
+									
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .then(reg => console.log('Service Worker enregistré'))
-          .catch(err => console.error('Erreur SW:', err));
+        navigator.serviceWorker.register('/Calendrier-APP/service-worker.js')
+          .then(reg => console.log('SW OK'))
+          .catch(err => console.error('SW erreur:', err));
       });
     }
 
-    // Gérer l'installation PWA
+								
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
       
-      // Afficher un bouton d'installation personnalisé
+														
       const installBtn = document.createElement('button');
-      installBtn.textContent = '📱 Installer l\'application';
-      installBtn.className = 'fixed bottom-4 right-4 px-6 py-3 bg-blue-500 text-white rounded-lg shadow-lg hover:bg-blue-600 z-50';
+      installBtn.textContent = '📱 Installer';
+      installBtn.className = 'fixed bottom-4 right-4 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-lg z-50 text-sm';
       installBtn.onclick = async () => {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
