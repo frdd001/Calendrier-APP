@@ -2,7 +2,7 @@
   "name": "Calendri-booth",
   "short_name": "Calendri-booth",
   "description": "Application de gestion de location de photobooths",
-  "start_url": "/",
+  "start_url": "/Calendrier-APP/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
