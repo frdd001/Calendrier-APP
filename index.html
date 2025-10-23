@@ -669,7 +669,15 @@
 
       const getEventsForDay = (day) => {
         const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dayReservations = reservations.filter(r => r.dateDebut === dateStr || r.dateFin === dateStr);
+        
+        // Pour les réservations, afficher sur tous les jours entre dateDebut et dateFin
+        const dayReservations = reservations.filter(r => {
+          const debut = new Date(r.dateDebut);
+          const fin = new Date(r.dateFin);
+          const current = new Date(dateStr);
+          return current >= debut && current <= fin;
+        });
+        
         const dayRdvs = rdvs.filter(r => r.date === dateStr);
         return [...dayReservations, ...dayRdvs];
       };
@@ -758,61 +766,7 @@
                 <h1 className="text-lg font-bold text-blue-600">📷 Calendri-Booth</h1>
                 
                 <div className="flex gap-1 items-center text-xs">
-                  {accessToken ? (
-                    <>
-                      <div className="flex flex-col items-center">
-                        <button
-                          onClick={() => saveToDrive(false)}
-                          disabled={backupStatus === 'saving'}
-                          className={`px-2 py-1 text-xs rounded ${
-                            backupStatus === 'saving' ? 'bg-gray-300' :
-                            backupStatus === 'success' ? 'bg-green-500 text-white' :
-                            backupStatus === 'error' ? 'bg-red-500 text-white' :
-                            'bg-blue-500 text-white hover:bg-blue-600'
-                          }`}
-                          title={`Dernière sauvegarde: ${formatLastBackup()}`}
-                        >
-                          {backupStatus === 'saving' ? '💾...' :
-                           backupStatus === 'success' ? '✅' :
-                           backupStatus === 'error' ? '❌' :
-                           '💾'}
-                        </button>
-                        {nextAutoBackup && (
-                          <span className="text-xs text-gray-500" title="Prochaine sauvegarde auto">
-                            🤖{getTimeUntilNextBackup()}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={handleGoogleSignOut}
-                        className="px-2 py-1 text-xs bg-gray-500 text-white rounded"
-                        title="Déconnexion Google Drive"
-                      >
-                        ⏏️
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={handleGoogleSignIn}
-                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                      title="Connexion Google Drive pour sauvegarde auto"
-                    >
-                      🔐 Drive
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={exportData}
-                    className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
-                    title="Exporter les données"
-                  >
-                    📥
-                  </button>
-                  
-                  <label className="px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 cursor-pointer" title="Importer les données">
-                    📤
-                    <input type="file" accept=".json" onChange={importData} className="hidden" />
-                  </label>
+                  {/* Boutons déplacés dans les paramètres */}
                 </div>
               </div>
 
@@ -886,6 +840,71 @@
                 <h2 className="text-lg font-bold mb-3">🔧 Paramètres</h2>
                 
                 <div className="space-y-4">
+                  {/* Section Google Drive */}
+                  <div className="border-b pb-3">
+                    <h3 className="font-bold text-sm mb-2">☁️ Google Drive</h3>
+                    {accessToken ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => saveToDrive(false)}
+                            disabled={backupStatus === 'saving'}
+                            className={`flex-1 px-3 py-2 text-xs rounded ${
+                              backupStatus === 'saving' ? 'bg-gray-300' :
+                              backupStatus === 'success' ? 'bg-green-500 text-white' :
+                              backupStatus === 'error' ? 'bg-red-500 text-white' :
+                              'bg-blue-500 text-white hover:bg-blue-600'
+                            }`}
+                          >
+                            {backupStatus === 'saving' ? '💾 Sauvegarde...' :
+                             backupStatus === 'success' ? '✅ Sauvegarde réussie' :
+                             backupStatus === 'error' ? '❌ Erreur' :
+                             '💾 Sauvegarder sur Drive'}
+                          </button>
+                          <button
+                            onClick={handleGoogleSignOut}
+                            className="px-3 py-2 text-xs bg-gray-500 text-white rounded"
+                          >
+                            ⏏️ Déconnexion
+                          </button>
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          Dernière sauvegarde: {formatLastBackup()}
+                          {nextAutoBackup && (
+                            <div className="mt-1">
+                              🤖 Prochaine sauvegarde auto: {getTimeUntilNextBackup()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleGoogleSignIn}
+                        className="w-full px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        🔐 Connexion à Google Drive
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Section Import/Export */}
+                  <div className="border-b pb-3">
+                    <h3 className="font-bold text-sm mb-2">📦 Import / Export</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={exportData}
+                        className="flex-1 px-3 py-2 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        📥 Exporter les données
+                      </button>
+                      
+                      <label className="flex-1 px-3 py-2 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 cursor-pointer text-center">
+                        📤 Importer les données
+                        <input type="file" accept=".json" onChange={importData} className="hidden" />
+                      </label>
+                    </div>
+                  </div>
+                  
                   <div>
                     <h3 className="font-bold text-sm mb-2">💾 Sauvegarde automatique Google Drive</h3>
                     {accessToken ? (
@@ -1203,6 +1222,12 @@
                       {showEventDetail.theme && <div><strong>Thème:</strong> {showEventDetail.theme}</div>}
                     </>
                   )}
+                  {showEventDetail.type === 'rdv' && (
+                    <>
+                      {showEventDetail.lieu && <div><strong>Lieu:</strong> {showEventDetail.lieu}</div>}
+                      {showEventDetail.description && <div><strong>Description:</strong> {showEventDetail.description}</div>}
+                    </>
+                  )}
                 </div>
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => { setEditingItem(showEventDetail); setFormData(showEventDetail); setModalType(showEventDetail.type); setShowEventDetail(null); setShowAddModal(true); }} className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-xs">✏️ Modifier</button>
@@ -1285,6 +1310,7 @@
                     <input type="time" value={formData.heure || ''} onChange={(e) => setFormData({ ...formData, heure: e.target.value })} className="w-full p-2 border rounded text-sm" />
                     <input type="text" placeholder="Client" value={formData.clientNom || ''} onChange={(e) => setFormData({ ...formData, clientNom: e.target.value })} className="w-full p-2 border rounded text-sm" />
                     <input type="tel" placeholder="Téléphone" value={formData.clientTel || ''} onChange={(e) => setFormData({ ...formData, clientTel: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    <input type="text" placeholder="Lieu / Adresse" value={formData.lieu || ''} onChange={(e) => setFormData({ ...formData, lieu: e.target.value })} className="w-full p-2 border rounded text-sm" />
                     <textarea placeholder="Description" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full p-2 border rounded text-sm h-16"></textarea>
                   </div>
                 )}
