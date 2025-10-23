@@ -1,143 +1,86 @@
-const CACHE_NAME = 'photobooth-v1';
+// SERVICE WORKER - Version 2.0.0
+const CACHE_VERSION = 'calendri-booth-v2.0.0';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  'https://unpkg.com/react@18/umd/react.production.min.js',
-  'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
-  'https://unpkg.com/@babel/standalone/babel.min.js',
-  'https://cdn.tailwindcss.com',
-  'https://apis.google.com/js/api.js'
+  '/Calendrier-APP/',
+  '/Calendrier-APP/index.html',
+  '/Calendrier-APP/manifest.json'
 ];
 
 // Installation du Service Worker
 self.addEventListener('install', (event) => {
-  console.log('Service Worker : Installation');
+  console.log('[SW] Installation version:', CACHE_VERSION);
+  
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches.open(CACHE_VERSION)
       .then((cache) => {
-        console.log('Cache ouvert');
+        console.log('[SW] Cache ouvert');
         return cache.addAll(urlsToCache);
       })
-      .catch((err) => {
-        console.error('Erreur lors de la mise en cache:', err);
+      .then(() => {
+        // Force l'activation immédiate du nouveau SW
+        return self.skipWaiting();
       })
   );
-  self.skipWaiting();
 });
 
-// Activation du Service Worker
+// Activation et nettoyage des anciens caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker : Activation');
+  console.log('[SW] Activation version:', CACHE_VERSION);
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Suppression ancien cache:', cacheName);
+          if (cacheName !== CACHE_VERSION) {
+            console.log('[SW] Suppression ancien cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      // Prend le contrôle immédiatement de tous les clients
+      return self.clients.claim();
     })
   );
-  return self.clients.claim();
 });
 
-// Interception des requêtes
+// Stratégie : Network First, puis Cache (toujours chercher la dernière version)
 self.addEventListener('fetch', (event) => {
-  // Ignorer les requêtes non-GET
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  // Ignorer les requêtes vers l'API Google
-  if (event.request.url.includes('googleapis.com') || 
-      event.request.url.includes('telegram.org')) {
-    return fetch(event.request);
-  }
-
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then((response) => {
-        // Retourner la ressource du cache si disponible
-        if (response) {
-          return response;
-        }
-
-        // Sinon, faire la requête réseau
-        return fetch(event.request).then((response) => {
-          // Vérifier si la réponse est valide
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Cloner la réponse pour la mettre en cache
+        // Si la requête réseau réussit, on met à jour le cache
+        if (response && response.status === 200) {
           const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
+          caches.open(CACHE_VERSION)
             .then((cache) => {
               cache.put(event.request, responseToCache);
             });
-
-          return response;
-        }).catch(() => {
-          // En cas d'erreur réseau, retourner une page offline
-          return caches.match('/index.html');
-        });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Si le réseau échoue, on utilise le cache
+        return caches.match(event.request)
+          .then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // Si pas de cache non plus, erreur
+            return new Response('Offline - Contenu non disponible', {
+              status: 503,
+              statusText: 'Service Unavailable'
+            });
+          });
       })
   );
 });
 
-// Gestion des notifications push
-self.addEventListener('push', (event) => {
-  const options = {
-    body: event.data ? event.data.text() : 'Nouvelle notification',
-    icon: '/icon-192.png',
-    badge: '/badge-72.png',
-    vibrate: [200, 100, 200],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    },
-    actions: [
-      {
-        action: 'explore',
-        title: 'Voir',
-        icon: '/check.png'
-      },
-      {
-        action: 'close',
-        title: 'Fermer',
-        icon: '/cross.png'
-      }
-    ]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification('Calendri-booth', options)
-  );
-});
-
-// Gestion des clics sur notifications
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-
-  if (event.action === 'explore') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
+// Écouter les messages pour forcer la mise à jour
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 
-// Synchronisation en arrière-plan
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-data') {
-    event.waitUntil(syncData());
-  }
-});
-
-async function syncData() {
-  // Logique de synchronisation avec Google Drive
-  console.log('Synchronisation des données en arrière-plan');
-}
+console.log('[SW] Service Worker chargé - Version:', CACHE_VERSION);
