@@ -50,14 +50,18 @@
         weeklyReminder: true,
         dailyReminder: true,
         urgentAlerts: true,
-        stockAlerts: true
+        stockAlerts: true,
+        autoBackupInterval: 60 // minutes
       });
       const [isGapiLoaded, setIsGapiLoaded] = useState(false);
       const [accessToken, setAccessToken] = useState(null);
       const [lastBackup, setLastBackup] = useState(null);
       const [backupStatus, setBackupStatus] = useState('idle');
+      const [nextAutoBackup, setNextAutoBackup] = useState(null);
       
       const tokenClient = useRef(null);
+      const autoBackupTimerRef = useRef(null);
+      const countdownTimerRef = useRef(null);
 
       // Initialisation de Google API
       useEffect(() => {
@@ -72,7 +76,6 @@
               console.log('✅ Google API Client initialisé');
             } catch (err) {
               console.error('❌ Erreur init gapi.client:', err);
-              addNotification('warning', '⚠️ Erreur', 'Impossible d\'initialiser Google Drive', 'high');
             }
           });
         };
@@ -86,17 +89,25 @@
               callback: (response) => {
                 if (response.access_token) {
                   setAccessToken(response.access_token);
+                  localStorage.setItem('accessToken', response.access_token);
                   gapi.client.setToken({ access_token: response.access_token });
                   console.log('✅ Authentifié avec succès');
-                  addNotification('info', '✅ Connecté', 'Connecté à Google Drive avec succès', 'normal');
+                  addNotification('info', '✅ Connecté', 'Connecté à Google Drive', 'normal');
                   loadFromDrive();
                 } else {
                   console.error('❌ Pas de token reçu');
-                  addNotification('warning', '⚠️ Erreur', 'Échec de la connexion à Google Drive', 'high');
                 }
               },
             });
             console.log('✅ Google Identity Services initialisé');
+            
+            // Restaurer le token si disponible
+            const savedToken = localStorage.getItem('accessToken');
+            if (savedToken) {
+              setAccessToken(savedToken);
+              gapi.client.setToken({ access_token: savedToken });
+              loadFromDrive();
+            }
           }
         };
 
@@ -115,8 +126,6 @@
       const handleGoogleSignIn = () => {
         if (tokenClient.current) {
           tokenClient.current.requestAccessToken({ prompt: 'consent' });
-        } else {
-          addNotification('warning', '⚠️ Erreur', 'Service Google non disponible', 'high');
         }
       };
 
@@ -125,16 +134,25 @@
         if (accessToken) {
           google.accounts.oauth2.revoke(accessToken, () => {
             setAccessToken(null);
+            localStorage.removeItem('accessToken');
             gapi.client.setToken(null);
+            if (autoBackupTimerRef.current) {
+              clearInterval(autoBackupTimerRef.current);
+            }
+            if (countdownTimerRef.current) {
+              clearInterval(countdownTimerRef.current);
+            }
             addNotification('info', '👋 Déconnecté', 'Déconnecté de Google Drive', 'normal');
           });
         }
       };
 
       // Sauvegarde sur Drive
-      const saveToDrive = async () => {
+      const saveToDrive = async (isAuto = false) => {
         if (!accessToken) {
-          alert('❌ Connectez-vous à Google Drive pour sauvegarder');
+          if (!isAuto) {
+            alert('❌ Connectez-vous à Google Drive pour sauvegarder');
+          }
           return;
         }
 
@@ -153,7 +171,6 @@
         };
 
         try {
-          // Rechercher si un fichier existe déjà
           const response = await gapi.client.drive.files.list({
             spaces: 'appDataFolder',
             fields: 'files(id, name)',
@@ -202,8 +219,9 @@
           if (fetchResponse.ok) {
             const newBackupTime = new Date().toISOString();
             setLastBackup(newBackupTime);
+            localStorage.setItem('lastBackup', newBackupTime);
             setBackupStatus('success');
-            addNotification('info', '💾 Sauvegarde réussie', 'Données sauvegardées sur Google Drive', 'normal');
+            addNotification('info', isAuto ? '🤖 Sauvegarde auto' : '💾 Sauvegarde', 'Données sauvegardées sur Google Drive', 'normal');
             setTimeout(() => setBackupStatus('idle'), 3000);
           } else {
             throw new Error('Échec de la sauvegarde');
@@ -211,7 +229,9 @@
         } catch (error) {
           console.error('❌ Erreur sauvegarde Drive:', error);
           setBackupStatus('error');
-          addNotification('warning', '⚠️ Erreur sauvegarde', 'Impossible de sauvegarder sur Drive', 'high');
+          if (!isAuto) {
+            addNotification('warning', '⚠️ Erreur', 'Impossible de sauvegarder sur Drive', 'high');
+          }
           setTimeout(() => setBackupStatus('idle'), 3000);
         }
       };
@@ -248,13 +268,19 @@
               setBobines(data.bobines || []);
               setStock(data.stock || []);
               setNotifications(data.notifications || []);
-              setNotificationSettings(data.notificationSettings || notificationSettings);
+              if (data.notificationSettings) {
+                setNotificationSettings({
+                  ...notificationSettings,
+                  ...data.notificationSettings
+                });
+              }
               setLastBackup(data.lastBackup);
+              localStorage.setItem('lastBackup', data.lastBackup);
               
-              addNotification('info', '✅ Données restaurées', 'Données chargées depuis Google Drive', 'normal');
+              addNotification('info', '✅ Données restaurées', 'Chargées depuis Google Drive', 'normal');
             }
           } else {
-            console.log('ℹ️ Aucun fichier de sauvegarde trouvé sur Drive');
+            console.log('ℹ️ Aucun fichier de sauvegarde sur Drive');
             loadFromLocalStorage();
           }
         } catch (error) {
@@ -263,7 +289,67 @@
         }
       };
 
-      // Export manuel des données
+      // Sauvegarde automatique avec compteur
+      useEffect(() => {
+        if (!accessToken || !notificationSettings.autoBackupInterval) return;
+
+        const intervalMinutes = notificationSettings.autoBackupInterval;
+        const intervalMs = intervalMinutes * 60 * 1000;
+
+        // Sauvegarder immédiatement si dernière sauvegarde > intervalle
+        const savedLastBackup = localStorage.getItem('lastBackup');
+        if (savedLastBackup) {
+          const lastBackupTime = new Date(savedLastBackup);
+          const now = new Date();
+          const timeSinceLastBackup = now - lastBackupTime;
+          if (timeSinceLastBackup > intervalMs) {
+            saveToDrive(true);
+          }
+        }
+
+        // Définir le prochain backup
+        const nextBackupTime = new Date(Date.now() + intervalMs);
+        setNextAutoBackup(nextBackupTime);
+
+        // Timer pour la sauvegarde automatique
+        autoBackupTimerRef.current = setInterval(() => {
+          saveToDrive(true);
+          const nextTime = new Date(Date.now() + intervalMs);
+          setNextAutoBackup(nextTime);
+        }, intervalMs);
+
+        // Countdown timer pour afficher le temps restant
+        countdownTimerRef.current = setInterval(() => {
+          setNextAutoBackup(prev => {
+            if (!prev) return null;
+            return new Date(prev);
+          });
+        }, 60000); // Mise à jour toutes les minutes
+
+        return () => {
+          if (autoBackupTimerRef.current) clearInterval(autoBackupTimerRef.current);
+          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        };
+      }, [accessToken, notificationSettings.autoBackupInterval, bornes, forfaits, reservations, rdvs, bobines, stock]);
+
+      // Calculer le temps restant avant la prochaine sauvegarde
+      const getTimeUntilNextBackup = () => {
+        if (!nextAutoBackup) return '';
+        const now = new Date();
+        const diff = nextAutoBackup - now;
+        if (diff <= 0) return 'En cours...';
+        
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        
+        if (hours > 0) {
+          return `${hours}h${mins}m`;
+        }
+        return `${mins}m`;
+      };
+
+      // Export manuel
       const exportData = () => {
         const data = {
           bornes,
@@ -286,10 +372,10 @@
         link.click();
         URL.revokeObjectURL(url);
         
-        addNotification('info', '💾 Export réussi', 'Fichier téléchargé avec succès', 'normal');
+        addNotification('info', '💾 Export réussi', 'Fichier téléchargé', 'normal');
       };
 
-      // Import manuel des données
+      // Import manuel
       const importData = (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -305,9 +391,14 @@
             setBobines(data.bobines || []);
             setStock(data.stock || []);
             setNotifications(data.notifications || []);
-            setNotificationSettings(data.notificationSettings || notificationSettings);
+            if (data.notificationSettings) {
+              setNotificationSettings({
+                ...notificationSettings,
+                ...data.notificationSettings
+              });
+            }
             
-            addNotification('info', '✅ Import réussi', 'Données restaurées depuis le fichier', 'normal');
+            addNotification('info', '✅ Import réussi', 'Données restaurées', 'normal');
           } catch (error) {
             console.error('❌ Erreur import:', error);
             addNotification('warning', '⚠️ Erreur', 'Fichier invalide', 'high');
@@ -316,25 +407,28 @@
         reader.readAsText(file);
       };
 
-      // Chargement depuis localStorage
+      // Chargement localStorage
       const loadFromLocalStorage = () => {
-        const savedBornes = localStorage.getItem('bornes');
-        const savedForfaits = localStorage.getItem('forfaits');
-        const savedReservations = localStorage.getItem('reservations');
-        const savedRdvs = localStorage.getItem('rdvs');
-        const savedBobines = localStorage.getItem('bobines');
-        const savedStock = localStorage.getItem('stock');
-        const savedNotifications = localStorage.getItem('notifications');
-        const savedNotificationSettings = localStorage.getItem('notificationSettings');
+        const items = ['bornes', 'forfaits', 'reservations', 'rdvs', 'bobines', 'stock', 'notifications', 'notificationSettings'];
+        items.forEach(item => {
+          const saved = localStorage.getItem(item);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            switch(item) {
+              case 'bornes': setBornes(parsed); break;
+              case 'forfaits': setForfaits(parsed); break;
+              case 'reservations': setReservations(parsed); break;
+              case 'rdvs': setRdvs(parsed); break;
+              case 'bobines': setBobines(parsed); break;
+              case 'stock': setStock(parsed); break;
+              case 'notifications': setNotifications(parsed); break;
+              case 'notificationSettings': setNotificationSettings({...notificationSettings, ...parsed}); break;
+            }
+          }
+        });
         
-        if (savedBornes) setBornes(JSON.parse(savedBornes));
-        if (savedForfaits) setForfaits(JSON.parse(savedForfaits));
-        if (savedReservations) setReservations(JSON.parse(savedReservations));
-        if (savedRdvs) setRdvs(JSON.parse(savedRdvs));
-        if (savedBobines) setBobines(JSON.parse(savedBobines));
-        if (savedStock) setStock(JSON.parse(savedStock));
-        if (savedNotifications) setNotifications(JSON.parse(savedNotifications));
-        if (savedNotificationSettings) setNotificationSettings(JSON.parse(savedNotificationSettings));
+        const savedLastBackup = localStorage.getItem('lastBackup');
+        if (savedLastBackup) setLastBackup(savedLastBackup);
       };
 
       // Chargement initial
@@ -344,7 +438,7 @@
         }
       }, []);
 
-      // Sauvegarde automatique locale
+      // Sauvegarde locale automatique
       useEffect(() => {
         localStorage.setItem('bornes', JSON.stringify(bornes));
         localStorage.setItem('forfaits', JSON.stringify(forfaits));
@@ -356,18 +450,6 @@
         localStorage.setItem('notificationSettings', JSON.stringify(notificationSettings));
       }, [bornes, forfaits, reservations, rdvs, bobines, stock, notifications, notificationSettings]);
 
-      // Sauvegarde automatique sur Drive toutes les 24h
-      useEffect(() => {
-        if (!accessToken) return;
-
-        const autoBackup = setInterval(() => {
-          saveToDrive();
-        }, 24 * 60 * 60 * 1000); // 24 heures
-
-        return () => clearInterval(autoBackup);
-      }, [accessToken, bornes, forfaits, reservations, rdvs, bobines, stock]);
-
-      // Fonction pour trouver une bobine disponible
       const findAvailableBobine = (photosNeeded) => {
         const bobinesWithReservations = bobines.map(bobine => {
           const reserved = reservations
@@ -387,7 +469,6 @@
         return bobinesWithReservations.find(b => b.available >= photosNeeded);
       };
 
-      // Dégrever automatiquement les bobines
       useEffect(() => {
         const today = new Date().toISOString().split('T')[0];
         
@@ -411,7 +492,7 @@
                 )
               );
 
-              addNotification('info', '📦 Bobine dégrevée', `Bobine dégrevée de ${forfait.nbPhotos} photos`, 'normal');
+              addNotification('info', '📦 Bobine dégrevée', `${forfait.nbPhotos} photos`, 'normal');
             }
           }
         });
@@ -429,13 +510,13 @@
         };
         setNotifications(prev => [newNotif, ...prev]);
         
-        if (notificationSettings.telegram.enabled && priority !== 'normal') {
+        if (notificationSettings.telegram?.enabled && priority !== 'normal') {
           sendTelegramNotification(title, message);
         }
       };
 
       const sendTelegramNotification = async (title, message) => {
-        if (!notificationSettings.telegram.botToken || !notificationSettings.telegram.chatId) return;
+        if (!notificationSettings.telegram?.botToken || !notificationSettings.telegram?.chatId) return;
         
         try {
           const text = `🔔 *${title}*\n\n${message}`;
@@ -527,9 +608,9 @@
             const bobineDisponible = findAvailableBobine(forfait.nbPhotos);
             if (bobineDisponible) {
               finalData.bobineId = bobineDisponible.id;
-              addNotification('info', '✅ Bobine attribuée', `Bobine #${bobineDisponible.numero} attribuée`, 'normal');
+              addNotification('info', '✅ Bobine attribuée', `Bobine #${bobineDisponible.numero}`, 'normal');
             } else {
-              addNotification('warning', '⚠️ Pas de bobine', `Aucune bobine disponible pour ${forfait.nbPhotos} photos`, 'high');
+              addNotification('warning', '⚠️ Pas de bobine', `Aucune bobine pour ${forfait.nbPhotos} photos`, 'high');
             }
           }
           
@@ -652,6 +733,23 @@
         return days;
       };
 
+      // Formater la date de dernière sauvegarde
+      const formatLastBackup = () => {
+        if (!lastBackup) return 'Jamais';
+        const date = new Date(lastBackup);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        
+        if (diffMins < 1) return 'À l\'instant';
+        if (diffMins < 60) return `Il y a ${diffMins}min`;
+        if (diffHours < 24) return `Il y a ${diffHours}h`;
+        if (diffDays < 7) return `Il y a ${diffDays}j`;
+        return date.toLocaleDateString('fr-FR');
+      };
+
       return (
         <div className="min-h-screen bg-gray-100">
           <div className="sticky top-0 z-30 bg-white shadow-md">
@@ -662,22 +760,29 @@
                 <div className="flex gap-1 items-center text-xs">
                   {accessToken ? (
                     <>
-                      <button
-                        onClick={saveToDrive}
-                        disabled={backupStatus === 'saving'}
-                        className={`px-2 py-1 text-xs rounded ${
-                          backupStatus === 'saving' ? 'bg-gray-300' :
-                          backupStatus === 'success' ? 'bg-green-500 text-white' :
-                          backupStatus === 'error' ? 'bg-red-500 text-white' :
-                          'bg-blue-500 text-white hover:bg-blue-600'
-                        }`}
-                        title="Sauvegarder sur Google Drive"
-                      >
-                        {backupStatus === 'saving' ? '💾...' :
-                         backupStatus === 'success' ? '✅' :
-                         backupStatus === 'error' ? '❌' :
-                         '💾'}
-                      </button>
+                      <div className="flex flex-col items-center">
+                        <button
+                          onClick={() => saveToDrive(false)}
+                          disabled={backupStatus === 'saving'}
+                          className={`px-2 py-1 text-xs rounded ${
+                            backupStatus === 'saving' ? 'bg-gray-300' :
+                            backupStatus === 'success' ? 'bg-green-500 text-white' :
+                            backupStatus === 'error' ? 'bg-red-500 text-white' :
+                            'bg-blue-500 text-white hover:bg-blue-600'
+                          }`}
+                          title={`Dernière sauvegarde: ${formatLastBackup()}`}
+                        >
+                          {backupStatus === 'saving' ? '💾...' :
+                           backupStatus === 'success' ? '✅' :
+                           backupStatus === 'error' ? '❌' :
+                           '💾'}
+                        </button>
+                        {nextAutoBackup && (
+                          <span className="text-xs text-gray-500" title="Prochaine sauvegarde auto">
+                            🤖{getTimeUntilNextBackup()}
+                          </span>
+                        )}
+                      </div>
                       <button
                         onClick={handleGoogleSignOut}
                         className="px-2 py-1 text-xs bg-gray-500 text-white rounded"
@@ -690,7 +795,7 @@
                     <button
                       onClick={handleGoogleSignIn}
                       className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                      title="Connexion Google Drive"
+                      title="Connexion Google Drive pour sauvegarde auto"
                     >
                       🔐 Drive
                     </button>
@@ -729,6 +834,14 @@
                   ⚙️
                 </button>
                 <button
+                  onClick={() => { setView('settings'); setShowNotifications(false); }}
+                  className={`px-2 py-1 rounded-t-lg ${
+                    view === 'settings' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                  }`}
+                >
+                  🔧
+                </button>
+                <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   className="ml-auto px-2 py-1 rounded-t-lg bg-gray-200 relative"
                 >
@@ -748,23 +861,75 @@
               <div className="mb-4 bg-white rounded-lg shadow p-3">
                 <div className="flex justify-between items-center mb-2">
                   <h2 className="text-lg font-bold">🔔 Notifications</h2>
-                  <button onClick={() => setView('notif-settings')} className="text-blue-500 text-xs">⚙️</button>
                 </div>
                 {notifications.length === 0 ? (
                   <p className="text-gray-500 text-center py-4 text-sm">Aucune notification</p>
                 ) : (
                   <div className="space-y-2">
-                    {notifications.slice(0, 5).map(notif => (
+                    {notifications.slice(0, 10).map(notif => (
                       <div key={notif.id} className={`p-2 rounded text-xs ${notif.read ? 'opacity-60' : ''}`}>
                         <div className="flex justify-between">
                           <span className="font-bold">{notif.title}</span>
                           <button onClick={() => deleteNotification(notif.id)} className="text-red-500">✕</button>
                         </div>
                         <p className="text-xs">{notif.message}</p>
+                        <p className="text-xs text-gray-400">{new Date(notif.date).toLocaleString('fr-FR')}</p>
                       </div>
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {view === 'settings' && (
+              <div className="bg-white rounded-lg shadow p-4 mb-3">
+                <h2 className="text-lg font-bold mb-3">🔧 Paramètres</h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-bold text-sm mb-2">💾 Sauvegarde automatique Google Drive</h3>
+                    {accessToken ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs">Intervalle (minutes):</label>
+                          <select 
+                            value={notificationSettings.autoBackupInterval} 
+                            onChange={(e) => setNotificationSettings({...notificationSettings, autoBackupInterval: parseInt(e.target.value)})}
+                            className="p-1 border rounded text-xs"
+                          >
+                            <option value="15">15 min</option>
+                            <option value="30">30 min</option>
+                            <option value="60">1 heure</option>
+                            <option value="180">3 heures</option>
+                            <option value="360">6 heures</option>
+                            <option value="720">12 heures</option>
+                            <option value="1440">24 heures</option>
+                          </select>
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          <div>✅ Connecté à Google Drive</div>
+                          <div>📅 Dernière sauvegarde: {formatLastBackup()}</div>
+                          {nextAutoBackup && <div>⏰ Prochaine sauvegarde: dans {getTimeUntilNextBackup()}</div>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-600">
+                        ❌ Non connecté. Cliquez sur "🔐 Drive" en haut pour activer la sauvegarde automatique.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t pt-3">
+                    <h3 className="font-bold text-sm mb-2">ℹ️ Informations</h3>
+                    <div className="text-xs space-y-1">
+                      <div>Version: 2.0.0</div>
+                      <div>📦 Bornes: {bornes.length}</div>
+                      <div>📷 Réservations: {reservations.length}</div>
+                      <div>📅 RDV: {rdvs.length}</div>
+                      <div>🎞️ Bobines: {bobines.length}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1147,12 +1312,37 @@
       );
     }
 
-    // Service Worker
+    // Service Worker avec détection de mise à jour
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/Calendrier-APP/service-worker.js')
-          .then(reg => console.log('SW OK'))
-          .catch(err => console.error('SW erreur:', err));
+          .then(reg => {
+            console.log('✅ Service Worker enregistré');
+            
+            // Vérifier les mises à jour
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Nouvelle version disponible
+                  if (confirm('🔄 Une nouvelle version est disponible ! Recharger maintenant ?')) {
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    window.location.reload();
+                  }
+                }
+              });
+            });
+          })
+          .catch(err => console.error('❌ Erreur Service Worker:', err));
+      });
+
+      // Recharger quand le nouveau SW prend le contrôle
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
       });
     }
 
@@ -1164,7 +1354,7 @@
       
       const installBtn = document.createElement('button');
       installBtn.textContent = '📱 Installer';
-      installBtn.className = 'fixed bottom-4 right-4 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-lg z-50 text-sm';
+      installBtn.className = 'fixed bottom-20 left-4 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-lg z-50 text-sm';
       installBtn.onclick = async () => {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
