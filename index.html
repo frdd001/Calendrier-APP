@@ -12,19 +12,20 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- NOUVELLE API Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
   <div id="root"></div>
   
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     // ⚠️ REMPLACEZ ICI VOS CLÉS GOOGLE
     const CLIENT_ID = '362970811261-iemtpn2m017af2ja4qsqjsjbkou59cje.apps.googleusercontent.com';
     const API_KEY = 'AIzaSyB7UaolNFtg__7qweEzNiwr40c4Gk13lQ8';
-    const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
-    const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file';
 
     function PhotoboothManager() {
       const [view, setView] = useState('calendar');
@@ -46,70 +47,94 @@
       const [showNotifications, setShowNotifications] = useState(false);
       const [notificationSettings, setNotificationSettings] = useState({
         telegram: { enabled: false, botToken: '', chatId: '' },
-									   
         weeklyReminder: true,
         dailyReminder: true,
         urgentAlerts: true,
         stockAlerts: true
-							 
       });
       const [isGapiLoaded, setIsGapiLoaded] = useState(false);
-      const [isSignedIn, setIsSignedIn] = useState(false);
+      const [accessToken, setAccessToken] = useState(null);
       const [lastBackup, setLastBackup] = useState(null);
       const [backupStatus, setBackupStatus] = useState('idle');
+      
+      const tokenClient = useRef(null);
 
-					   
+      // Initialisation de Google API
       useEffect(() => {
-        const initGapi = () => {
-          if (typeof gapi !== 'undefined') {
-            gapi.load('client:auth2', () => {
-              gapi.client.init({
+        const initializeGapi = () => {
+          gapi.load('client', async () => {
+            try {
+              await gapi.client.init({
                 apiKey: API_KEY,
-                clientId: CLIENT_ID,
-                discoveryDocs: DISCOVERY_DOCS,
-                scope: SCOPES
-              }).then(() => {
-                setIsGapiLoaded(true);
-                const authInstance = gapi.auth2.getAuthInstance();
-                setIsSignedIn(authInstance.isSignedIn.get());
-                authInstance.isSignedIn.listen(setIsSignedIn);
-                
-                if (authInstance.isSignedIn.get()) {
-                  loadFromDrive();
-                }
-              }).catch(err => {
-                console.error('Erreur init Google API:', err);
+                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
               });
+              setIsGapiLoaded(true);
+              console.log('✅ Google API Client initialisé');
+            } catch (err) {
+              console.error('❌ Erreur init gapi.client:', err);
+              addNotification('warning', '⚠️ Erreur', 'Impossible d\'initialiser Google Drive', 'high');
+            }
+          });
+        };
+
+        // Initialiser le client OAuth2
+        const initializeGSI = () => {
+          if (typeof google !== 'undefined' && google.accounts) {
+            tokenClient.current = google.accounts.oauth2.initTokenClient({
+              client_id: CLIENT_ID,
+              scope: SCOPES,
+              callback: (response) => {
+                if (response.access_token) {
+                  setAccessToken(response.access_token);
+                  gapi.client.setToken({ access_token: response.access_token });
+                  console.log('✅ Authentifié avec succès');
+                  addNotification('info', '✅ Connecté', 'Connecté à Google Drive avec succès', 'normal');
+                  loadFromDrive();
+                } else {
+                  console.error('❌ Pas de token reçu');
+                  addNotification('warning', '⚠️ Erreur', 'Échec de la connexion à Google Drive', 'high');
+                }
+              },
             });
+            console.log('✅ Google Identity Services initialisé');
           }
         };
 
         if (document.readyState === 'complete') {
-          initGapi();
+          initializeGapi();
+          initializeGSI();
         } else {
-          window.addEventListener('load', initGapi);
+          window.addEventListener('load', () => {
+            initializeGapi();
+            initializeGSI();
+          });
         }
-
-        return () => window.removeEventListener('load', initGapi);
       }, []);
 
-					   
+      // Fonction de connexion
       const handleGoogleSignIn = () => {
-        if (isGapiLoaded) {
-          gapi.auth2.getAuthInstance().signIn();
+        if (tokenClient.current) {
+          tokenClient.current.requestAccessToken({ prompt: 'consent' });
+        } else {
+          addNotification('warning', '⚠️ Erreur', 'Service Google non disponible', 'high');
         }
       };
 
+      // Fonction de déconnexion
       const handleGoogleSignOut = () => {
-        if (isGapiLoaded) {
-          gapi.auth2.getAuthInstance().signOut();
+        if (accessToken) {
+          google.accounts.oauth2.revoke(accessToken, () => {
+            setAccessToken(null);
+            gapi.client.setToken(null);
+            addNotification('info', '👋 Déconnecté', 'Déconnecté de Google Drive', 'normal');
+          });
         }
       };
 
-							 
+      // Sauvegarde sur Drive
       const saveToDrive = async () => {
-        if (!isSignedIn) {
-          alert('Connectez-vous à Google Drive pour sauvegarder');
+        if (!accessToken) {
+          alert('❌ Connectez-vous à Google Drive pour sauvegarder');
           return;
         }
 
@@ -128,11 +153,11 @@
         };
 
         try {
-										 
+          // Rechercher si un fichier existe déjà
           const response = await gapi.client.drive.files.list({
             spaces: 'appDataFolder',
             fields: 'files(id, name)',
-            q: "name='photobooth_backup.json'"
+            q: "name='calendri_booth_backup.json'"
           });
 
           const boundary = '-------314159265358979323846';
@@ -140,13 +165,14 @@
           const close_delim = "\r\n--" + boundary + "--";
 
           const metadata = {
-            name: 'photobooth_backup.json',
-            mimeType: 'application/json'
+            name: 'calendri_booth_backup.json',
+            mimeType: 'application/json',
+            parents: ['appDataFolder']
           };
 
           const multipartRequestBody =
             delimiter +
-            'Content-Type: application/json\r\n\r\n' +
+            'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
             JSON.stringify(metadata) +
             delimiter +
             'Content-Type: application/json\r\n\r\n' +
@@ -158,55 +184,120 @@
             fileId = response.result.files[0].id;
           }
 
-          const request = gapi.client.request({
-            path: fileId 
-              ? `/upload/drive/v3/files/${fileId}`
-              : '/upload/drive/v3/files',
-            method: fileId ? 'PATCH' : 'POST',
-            params: {
-              uploadType: 'multipart',
-              ...(fileId ? {} : { fields: 'id' })
-            },
+          const requestUrl = fileId 
+            ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
+            : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+
+          const requestMethod = fileId ? 'PATCH' : 'POST';
+
+          const fetchResponse = await fetch(requestUrl, {
+            method: requestMethod,
             headers: {
-              'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': `multipart/related; boundary="${boundary}"`
             },
             body: multipartRequestBody
           });
 
-          await request;
-          
-          setLastBackup(new Date().toISOString());
-          setBackupStatus('success');
-          addNotification('info', '💾 Sauvegarde réussie', 'Données sauvegardées sur Google Drive', 'normal');
-          
-          setTimeout(() => setBackupStatus('idle'), 3000);
+          if (fetchResponse.ok) {
+            const newBackupTime = new Date().toISOString();
+            setLastBackup(newBackupTime);
+            setBackupStatus('success');
+            addNotification('info', '💾 Sauvegarde réussie', 'Données sauvegardées sur Google Drive', 'normal');
+            setTimeout(() => setBackupStatus('idle'), 3000);
+          } else {
+            throw new Error('Échec de la sauvegarde');
+          }
         } catch (error) {
-          console.error('Erreur sauvegarde Drive:', error);
+          console.error('❌ Erreur sauvegarde Drive:', error);
           setBackupStatus('error');
           addNotification('warning', '⚠️ Erreur sauvegarde', 'Impossible de sauvegarder sur Drive', 'high');
           setTimeout(() => setBackupStatus('idle'), 3000);
         }
       };
 
-							
+      // Chargement depuis Drive
       const loadFromDrive = async () => {
-        if (!isSignedIn) return;
+        if (!accessToken) return;
 
         try {
           const response = await gapi.client.drive.files.list({
             spaces: 'appDataFolder',
             fields: 'files(id, name)',
-            q: "name='photobooth_backup.json'"
+            q: "name='calendri_booth_backup.json'"
           });
 
           if (response.result.files && response.result.files.length > 0) {
             const fileId = response.result.files[0].id;
-            const file = await gapi.client.drive.files.get({
-              fileId: fileId,
-              alt: 'media'
-            });
+            
+            const fileResponse = await fetch(
+              `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`
+                }
+              }
+            );
 
-            const data = file.result;
+            if (fileResponse.ok) {
+              const data = await fileResponse.json();
+              setBornes(data.bornes || []);
+              setForfaits(data.forfaits || []);
+              setReservations(data.reservations || []);
+              setRdvs(data.rdvs || []);
+              setBobines(data.bobines || []);
+              setStock(data.stock || []);
+              setNotifications(data.notifications || []);
+              setNotificationSettings(data.notificationSettings || notificationSettings);
+              setLastBackup(data.lastBackup);
+              
+              addNotification('info', '✅ Données restaurées', 'Données chargées depuis Google Drive', 'normal');
+            }
+          } else {
+            console.log('ℹ️ Aucun fichier de sauvegarde trouvé sur Drive');
+            loadFromLocalStorage();
+          }
+        } catch (error) {
+          console.error('❌ Erreur chargement Drive:', error);
+          loadFromLocalStorage();
+        }
+      };
+
+      // Export manuel des données
+      const exportData = () => {
+        const data = {
+          bornes,
+          forfaits,
+          reservations,
+          rdvs,
+          bobines,
+          stock,
+          notifications,
+          notificationSettings,
+          exportDate: new Date().toISOString()
+        };
+
+        const dataStr = JSON.stringify(data, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `calendri-booth-backup-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        addNotification('info', '💾 Export réussi', 'Fichier téléchargé avec succès', 'normal');
+      };
+
+      // Import manuel des données
+      const importData = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
             setBornes(data.bornes || []);
             setForfaits(data.forfaits || []);
             setReservations(data.reservations || []);
@@ -215,18 +306,17 @@
             setStock(data.stock || []);
             setNotifications(data.notifications || []);
             setNotificationSettings(data.notificationSettings || notificationSettings);
-            setLastBackup(data.lastBackup);
             
-            addNotification('info', '✅ Données restaurées', 'Données chargées depuis Google Drive', 'normal');
+            addNotification('info', '✅ Import réussi', 'Données restaurées depuis le fichier', 'normal');
+          } catch (error) {
+            console.error('❌ Erreur import:', error);
+            addNotification('warning', '⚠️ Erreur', 'Fichier invalide', 'high');
           }
-        } catch (error) {
-          console.error('Erreur chargement Drive:', error);
-										
-          loadFromLocalStorage();
-        }
+        };
+        reader.readAsText(file);
       };
 
-							
+      // Chargement depuis localStorage
       const loadFromLocalStorage = () => {
         const savedBornes = localStorage.getItem('bornes');
         const savedForfaits = localStorage.getItem('forfaits');
@@ -247,14 +337,14 @@
         if (savedNotificationSettings) setNotificationSettings(JSON.parse(savedNotificationSettings));
       };
 
-								   
+      // Chargement initial
       useEffect(() => {
-        if (!isSignedIn) {
+        if (!accessToken) {
           loadFromLocalStorage();
         }
       }, []);
 
-							  
+      // Sauvegarde automatique locale
       useEffect(() => {
         localStorage.setItem('bornes', JSON.stringify(bornes));
         localStorage.setItem('forfaits', JSON.stringify(forfaits));
@@ -266,18 +356,18 @@
         localStorage.setItem('notificationSettings', JSON.stringify(notificationSettings));
       }, [bornes, forfaits, reservations, rdvs, bobines, stock, notifications, notificationSettings]);
 
-									  
+      // Sauvegarde automatique sur Drive toutes les 24h
       useEffect(() => {
-        if (!isSignedIn) return;
+        if (!accessToken) return;
 
         const autoBackup = setInterval(() => {
           saveToDrive();
-        }, 24 * 60 * 60 * 1000);
+        }, 24 * 60 * 60 * 1000); // 24 heures
 
         return () => clearInterval(autoBackup);
-      }, [isSignedIn, bornes, forfaits, reservations, rdvs, bobines, stock]);
+      }, [accessToken, bornes, forfaits, reservations, rdvs, bobines, stock]);
 
-											
+      // Fonction pour trouver une bobine disponible
       const findAvailableBobine = (photosNeeded) => {
         const bobinesWithReservations = bobines.map(bobine => {
           const reserved = reservations
@@ -297,7 +387,7 @@
         return bobinesWithReservations.find(b => b.available >= photosNeeded);
       };
 
-									  
+      // Dégrever automatiquement les bobines
       useEffect(() => {
         const today = new Date().toISOString().split('T')[0];
         
@@ -364,77 +454,6 @@
           console.error('Erreur Telegram:', error);
         }
       };
-
-			   
-								  
-			 
-												
-					 
-						  
-  
-														 
-									   
-									
-							  
-														  
-								  
-									   
-													   
-	   
-	
-						  
-														   
-	 
-   
-  
-														 
-														
-														 
-	
-														 
-																													
-	 
-   
-  
-						   
-									
-											
-	
-					 
-														  
-	 
-	
-					 
-																							  
-	 
-	 
-  
-										   
-											  
-															 
-									
-	 
-  
-													 
-																						
-   
-
-													  
-													
-																					
-   
-
-													  
-													  
-																							 
-   
-  
-	
-													 
-		 
-	
-							 
-													 
 
       const markAsRead = (id) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -542,7 +561,6 @@
               dateAjout: new Date().toISOString().split('T')[0]
             };
             setBobines([...bobines, newBobine]);
-													
           }
         }
         setShowAddModal(false);
@@ -641,9 +659,8 @@
               <div className="flex justify-between items-center py-2">
                 <h1 className="text-lg font-bold text-blue-600">📷 Calendri-Booth</h1>
                 
-									
                 <div className="flex gap-1 items-center text-xs">
-                  {isSignedIn ? (
+                  {accessToken ? (
                     <>
                       <button
                         onClick={saveToDrive}
@@ -654,6 +671,7 @@
                           backupStatus === 'error' ? 'bg-red-500 text-white' :
                           'bg-blue-500 text-white hover:bg-blue-600'
                         }`}
+                        title="Sauvegarder sur Google Drive"
                       >
                         {backupStatus === 'saving' ? '💾...' :
                          backupStatus === 'success' ? '✅' :
@@ -663,6 +681,7 @@
                       <button
                         onClick={handleGoogleSignOut}
                         className="px-2 py-1 text-xs bg-gray-500 text-white rounded"
+                        title="Déconnexion Google Drive"
                       >
                         ⏏️
                       </button>
@@ -670,19 +689,27 @@
                   ) : (
                     <button
                       onClick={handleGoogleSignIn}
-                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded"
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                      title="Connexion Google Drive"
                     >
                       🔐 Drive
                     </button>
                   )}
+                  
+                  <button
+                    onClick={exportData}
+                    className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                    title="Exporter les données"
+                  >
+                    📥
+                  </button>
+                  
+                  <label className="px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 cursor-pointer" title="Importer les données">
+                    📤
+                    <input type="file" accept=".json" onChange={importData} className="hidden" />
+                  </label>
                 </div>
               </div>
-
-				  
-											
-														   
-			  
-		
 
               <nav className="flex gap-1 border-b border-gray-200 pb-1 text-xs">
                 <button
@@ -1120,7 +1147,7 @@
       );
     }
 
-							
+    // Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/Calendrier-APP/service-worker.js')
@@ -1129,13 +1156,12 @@
       });
     }
 
-				
+    // Installation PWA
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
       
-												
       const installBtn = document.createElement('button');
       installBtn.textContent = '📱 Installer';
       installBtn.className = 'fixed bottom-4 right-4 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-lg z-50 text-sm';
