@@ -46,19 +46,19 @@
       const [showNotifications, setShowNotifications] = useState(false);
       const [notificationSettings, setNotificationSettings] = useState({
         telegram: { enabled: false, botToken: '', chatId: '' },
-											   
+									   
         weeklyReminder: true,
         dailyReminder: true,
         urgentAlerts: true,
         stockAlerts: true
-								 
+							 
       });
       const [isGapiLoaded, setIsGapiLoaded] = useState(false);
       const [isSignedIn, setIsSignedIn] = useState(false);
       const [lastBackup, setLastBackup] = useState(null);
       const [backupStatus, setBackupStatus] = useState('idle');
 
-							   
+					   
       useEffect(() => {
         const initGapi = () => {
           if (typeof gapi !== 'undefined') {
@@ -93,7 +93,7 @@
         return () => window.removeEventListener('load', initGapi);
       }, []);
 
-							   
+					   
       const handleGoogleSignIn = () => {
         if (isGapiLoaded) {
           gapi.auth2.getAuthInstance().signIn();
@@ -106,7 +106,7 @@
         }
       };
 
-									 
+							 
       const saveToDrive = async () => {
         if (!isSignedIn) {
           alert('Connectez-vous à Google Drive pour sauvegarder');
@@ -128,7 +128,7 @@
         };
 
         try {
-												 
+										 
           const response = await gapi.client.drive.files.list({
             spaces: 'appDataFolder',
             fields: 'files(id, name)',
@@ -188,7 +188,7 @@
         }
       };
 
-									
+							
       const loadFromDrive = async () => {
         if (!isSignedIn) return;
 
@@ -221,12 +221,12 @@
           }
         } catch (error) {
           console.error('Erreur chargement Drive:', error);
-													
+										
           loadFromLocalStorage();
         }
       };
 
-									
+							
       const loadFromLocalStorage = () => {
         const savedBornes = localStorage.getItem('bornes');
         const savedForfaits = localStorage.getItem('forfaits');
@@ -247,14 +247,14 @@
         if (savedNotificationSettings) setNotificationSettings(JSON.parse(savedNotificationSettings));
       };
 
-										   
+								   
       useEffect(() => {
         if (!isSignedIn) {
           loadFromLocalStorage();
         }
       }, []);
 
-									  
+							  
       useEffect(() => {
         localStorage.setItem('bornes', JSON.stringify(bornes));
         localStorage.setItem('forfaits', JSON.stringify(forfaits));
@@ -266,7 +266,7 @@
         localStorage.setItem('notificationSettings', JSON.stringify(notificationSettings));
       }, [bornes, forfaits, reservations, rdvs, bobines, stock, notifications, notificationSettings]);
 
-											  
+									  
       useEffect(() => {
         if (!isSignedIn) return;
 
@@ -277,7 +277,7 @@
         return () => clearInterval(autoBackup);
       }, [isSignedIn, bornes, forfaits, reservations, rdvs, bobines, stock]);
 
-													
+											
       const findAvailableBobine = (photosNeeded) => {
         const bobinesWithReservations = bobines.map(bobine => {
           const reserved = reservations
@@ -297,7 +297,7 @@
         return bobinesWithReservations.find(b => b.available >= photosNeeded);
       };
 
-											  
+									  
       useEffect(() => {
         const today = new Date().toISOString().split('T')[0];
         
@@ -365,76 +365,76 @@
         }
       };
 
-					   
-										  
-								 
-														
-										 
-									  
-		  
-																					 
-													   
-													
-											  
-																  
-												  
-													   
-															   
 			   
-			
-									  
-																													   
+								  
 			 
-		   
-		  
-																 
-																				
-																 
-			
-																 
-																																		
-			 
-		   
-		  
+												
+					 
+						  
+  
+														 
 									   
-													
-															
-			
-										 
-																												  
-			 
-			
-										 
-																														  
-			 
-			 
-		  
+									
+							  
+														  
+								  
+									   
+													   
+	   
+	
+						  
 														   
-															  
-																								 
+	 
+   
+  
+														 
+														
+														 
+	
+														 
+																													
+	 
+   
+  
+						   
+									
+											
+	
+					 
+														  
+	 
+	
+					 
+																							  
+	 
+	 
+  
+										   
+											  
+															 
+									
+	 
+  
+													 
+																						
+   
+
+													  
 													
-			 
-		  
-																			 
-																														
-		   
+																					
+   
 
-																		  
-																		
-																											
-		   
-
-																		  
-																		  
-																														 
-		   
-		  
-		
-																		 
+													  
+													  
+																							 
+   
+  
+	
+													 
+		 
+	
 							 
-		
-											 
-																	 
+													 
 
       const markAsRead = (id) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -460,7 +460,7 @@
           heureDebut: '10:00',
           dateFin: dateStr,
           heureFin: '23:00',
-          lieuDepot: '',
+          lieuRetrait: '',
           lieuRetour: '',
           theme: '',
           themeRealisé: false,
@@ -542,7 +542,7 @@
               dateAjout: new Date().toISOString().split('T')[0]
             };
             setBobines([...bobines, newBobine]);
-																																	 
+													
           }
         }
         setShowAddModal(false);
@@ -641,7 +641,7 @@
               <div className="flex justify-between items-center py-2">
                 <h1 className="text-lg font-bold text-blue-600">📷 Calendri-Booth</h1>
                 
-											
+									
                 <div className="flex gap-1 items-center text-xs">
                   {isSignedIn ? (
                     <>
@@ -678,11 +678,11 @@
                 </div>
               </div>
 
-							  
-															
-																					   
-					  
-				
+				  
+											
+														   
+			  
+		
 
               <nav className="flex gap-1 border-b border-gray-200 pb-1 text-xs">
                 <button
@@ -749,32 +749,100 @@
                     <h2 className="text-sm font-bold">{currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</h2>
                     <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">→</button>
                   </div>
-
-                  <div className="grid grid-cols-7 gap-0.5 text-xs">
-                    {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map(day => (
-                      <div key={day} className="text-center font-bold p-1 bg-gray-100 text-xs">{day}</div>
+                  
+                  <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                    {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map(day => (
+                      <div key={day} className="font-bold text-xs text-gray-600">{day}</div>
                     ))}
+                  </div>
+                  
+                  <div className="grid grid-cols-7 gap-1">
                     {renderCalendar()}
                   </div>
                 </div>
 
+                <div className="bg-white rounded-lg shadow p-3 mb-3">
+                  <h3 className="font-bold mb-2 text-sm">📋 Récapitulatif du mois</h3>
+                  {reservations.filter(r => {
+                    const resDate = new Date(r.dateDebut);
+                    return resDate.getMonth() === currentDate.getMonth() && resDate.getFullYear() === currentDate.getFullYear();
+                  }).length === 0 && rdvs.filter(r => {
+                    const rdvDate = new Date(r.date);
+                    return rdvDate.getMonth() === currentDate.getMonth() && rdvDate.getFullYear() === currentDate.getFullYear();
+                  }).length === 0 ? (
+                    <p className="text-gray-500 text-center py-4 text-sm">Aucun événement ce mois-ci</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {reservations.filter(r => {
+                        const resDate = new Date(r.dateDebut);
+                        return resDate.getMonth() === currentDate.getMonth() && resDate.getFullYear() === currentDate.getFullYear();
+                      }).map(res => {
+                        const borne = bornes.find(b => b.id == res.borneId);
+                        const forfait = forfaits.find(f => f.id == res.forfaitId);
+                        return (
+                          <div key={res.id} className="p-2 bg-blue-50 rounded text-xs border-l-4 border-blue-500">
+                            <div className="font-bold text-blue-700">📷 {res.clientNom} - {res.clientTel}</div>
+                            <div className="text-blue-600 font-bold mt-1">
+                              📅 Du {new Date(res.dateDebut).toLocaleDateString('fr-FR')} à {res.heureDebut}
+                              <br/>au {new Date(res.dateFin).toLocaleDateString('fr-FR')} à {res.heureFin}
+                            </div>
+                            <div className="border-t border-blue-200 mt-2 pt-2 space-y-1">
+                              <div><strong>Borne:</strong> {borne?.nom || 'N/A'}</div>
+                              <div><strong>Forfait:</strong> {forfait?.nom || 'N/A'}</div>
+                              {res.lieuRetrait && <div><strong>📍 Lieu de retrait:</strong> {res.lieuRetrait}</div>}
+                              {res.lieuRetour && <div><strong>📍 Lieu de retour:</strong> {res.lieuRetour}</div>}
+                              {res.theme && (
+                                <div className="flex items-center gap-1">
+                                  <strong>🎨 Thème:</strong> {res.theme}
+                                  <button onClick={() => toggleThemeRealise(res.id)} className={`ml-auto px-2 py-0.5 rounded text-xs ${res.themeRealisé ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>
+                                    {res.themeRealisé ? '✓ Fait' : 'À faire'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {rdvs.filter(r => {
+                        const rdvDate = new Date(r.date);
+                        return rdvDate.getMonth() === currentDate.getMonth() && rdvDate.getFullYear() === currentDate.getFullYear();
+                      }).map(rdv => (
+                        <div key={rdv.id} className="p-2 bg-green-50 rounded text-xs border-l-4 border-green-500">
+                          <div className="font-bold text-green-700">📅 {rdv.clientNom} - {rdv.clientTel}</div>
+                          <div className="text-green-600 font-bold mt-1">
+                            📅 {new Date(rdv.date).toLocaleDateString('fr-FR')} à {rdv.heure}
+                          </div>
+                          {rdv.description && (
+                            <div className="mt-2 pt-2 border-t border-green-200">
+                              <strong>Description:</strong> {rdv.description}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {themesAPreparer.length > 0 && (
-                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mb-3">
-                    <h2 className="text-sm font-bold mb-2">🎨 Thèmes à préparer</h2>
-                    {themesAPreparer.map(res => (
-                      <div key={res.id} className="bg-white p-2 rounded mb-2 text-xs">
-                        <div className="font-bold">{res.clientNom}</div>
-                        <div>{res.theme}</div>
-                        <button onClick={() => toggleThemeRealise(res.id)} className="mt-1 px-2 py-1 bg-green-500 text-white rounded text-xs">✓ Fait</button>
-                      </div>
-                    ))}
+                  <div className="bg-white rounded-lg shadow p-3 mb-3">
+                    <h3 className="font-bold mb-2 text-sm">🎨 Thèmes à préparer</h3>
+                    <div className="space-y-2">
+                      {themesAPreparer.map(res => (
+                        <div key={res.id} className="p-2 bg-yellow-50 rounded flex justify-between items-center text-xs">
+                          <div>
+                            <div className="font-bold">{res.clientNom}</div>
+                            <div className="text-xs text-gray-600">{res.theme}</div>
+                            <div className="text-xs text-gray-500">📅 {new Date(res.dateDebut).toLocaleDateString('fr-FR')}</div>
+                          </div>
+                          <button onClick={() => toggleThemeRealise(res.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">
+                            ✓ Fait
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-
-                <div className="flex gap-2">
-                  <button onClick={() => openReservationModal()} className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-sm">📷 Location</button>
-                  <button onClick={() => openRdvModal()} className="flex-1 px-3 py-2 bg-green-500 text-white rounded text-sm">📅 RDV</button>
-                </div>
               </>
             )}
 
@@ -782,85 +850,145 @@
               <div className="space-y-3">
                 <div className="bg-white rounded-lg shadow p-3">
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-bold text-sm">📦 Bornes</h3>
-                    <button onClick={() => { setModalType('borne'); setFormData({ nom: '', modele: '' }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                    <h3 className="font-bold text-sm">🖥️ Bornes</h3>
+                    <button onClick={() => { setModalType('borne'); setFormData({}); setEditingItem(null); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+ Ajouter</button>
                   </div>
-                  {bornes.map(b => (
-                    <div key={b.id} className="border-b py-1 text-xs flex justify-between">
-                      <span>{b.nom}</span>
-                      <button onClick={() => setConfirmDelete({ type: 'borne', id: b.id })} className="text-red-500">🗑️</button>
+                  {bornes.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4 text-sm">Aucune borne</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {bornes.map(b => (
+                        <div key={b.id} className="p-2 bg-gray-50 rounded flex justify-between items-center text-xs">
+                          <div>
+                            <div className="font-bold">{b.nom}</div>
+                            <div className="text-xs text-gray-600">{b.modele}</div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => { setEditingItem(b); setFormData(b); setModalType('borne'); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️</button>
+                            <button onClick={() => setConfirmDelete({ type: 'borne', id: b.id })} className="px-2 py-1 bg-red-500 text-white rounded text-xs">🗑️</button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-3">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-bold text-sm">💰 Forfaits</h3>
-                    <button onClick={() => { setModalType('forfait'); setFormData({ nom: '', prix: '', duree: '', nbPhotos: '' }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                    <button onClick={() => { setModalType('forfait'); setFormData({}); setEditingItem(null); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+ Ajouter</button>
                   </div>
-                  {forfaits.map(f => (
-                    <div key={f.id} className="border-b py-1 text-xs flex justify-between">
-                      <span>{f.nom} - {f.prix}€ {f.nbPhotos && `(${f.nbPhotos} photos)`}</span>
-                      <button onClick={() => setConfirmDelete({ type: 'forfait', id: f.id })} className="text-red-500">🗑️</button>
+                  {forfaits.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4 text-sm">Aucun forfait</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {forfaits.map(f => (
+                        <div key={f.id} className="p-2 bg-gray-50 rounded flex justify-between items-center text-xs">
+                          <div>
+                            <div className="font-bold">{f.nom}</div>
+                            <div className="text-xs text-gray-600">{f.prix}€ - {f.duree} - {f.nbPhotos} photos</div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => { setEditingItem(f); setFormData(f); setModalType('forfait'); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️</button>
+                            <button onClick={() => setConfirmDelete({ type: 'forfait', id: f.id })} className="px-2 py-1 bg-red-500 text-white rounded text-xs">🗑️</button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-3">
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-bold text-sm">🎞️ Bobines</h3>
-                    <button onClick={() => { setModalType('bobine'); const nextNum = bobines.length > 0 ? Math.max(...bobines.map(b => b.numero)) + 1 : 1; setFormData({ numero: nextNum, capacite: 400 }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                    <h3 className="font-bold text-sm">📦 Bobines</h3>
+                    <button onClick={() => { setModalType('bobine'); setFormData({ capacite: 400 }); setEditingItem(null); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+ Ajouter</button>
                   </div>
-                  {bobines.map(b => (
-                    <div key={b.id} className="border-b py-1 text-xs">
-                      <div className="flex justify-between">
-                        <span>Bobine #{b.numero}</span>
-                        <button onClick={() => setConfirmDelete({ type: 'bobine', id: b.id })} className="text-red-500">🗑️</button>
-                      </div>
-                      <div className="text-xs text-gray-600">{b.photosRestantes} / {b.capacite} photos</div>
+                  {bobines.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4 text-sm">Aucune bobine</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {bobines.map(b => {
+                        const reserved = reservations
+                          .filter(r => r.bobineId === b.id && !r.bobineConsommee)
+                          .reduce((sum, r) => {
+                            const forfait = forfaits.find(f => f.id == r.forfaitId);
+                            return sum + (forfait?.nbPhotos || 0);
+                          }, 0);
+                        const available = b.photosRestantes - reserved;
+                        
+                        return (
+                          <div key={b.id} className="p-2 bg-gray-50 rounded text-xs">
+                            <div className="flex justify-between items-center mb-1">
+                              <div className="font-bold">Bobine #{b.numero}</div>
+                              <div className="flex gap-1">
+                                <button onClick={() => { setEditingItem(b); setFormData(b); setModalType('bobine'); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️</button>
+                                <button onClick={() => setConfirmDelete({ type: 'bobine', id: b.id })} className="px-2 py-1 bg-red-500 text-white rounded text-xs">🗑️</button>
+                              </div>
+                            </div>
+                            <div className="text-xs space-y-0.5">
+                              <div>📸 Capacité: {b.capacite} photos</div>
+                              <div>✅ Disponibles: {b.photosRestantes} photos</div>
+                              {reserved > 0 && <div className="text-orange-600">🔒 Réservées: {reserved} photos</div>}
+                              <div className={`font-bold ${available < 50 ? 'text-red-600' : 'text-green-600'}`}>
+                                💡 Utilisables: {available} photos
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-3">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-bold text-sm">📦 Stock</h3>
-                    <button onClick={() => { setModalType('stock'); setFormData({ nom: '', quantite: 0, seuilAlerte: 0, unite: 'pièces' }); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+</button>
+                    <button onClick={() => { setModalType('stock'); setFormData({}); setEditingItem(null); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">+ Ajouter</button>
                   </div>
-                  {stock.map(s => (
-                    <div key={s.id} className="border-b py-1 text-xs flex justify-between">
-                      <span>{s.nom}: {s.quantite} {s.unite}</span>
-                      <button onClick={() => setConfirmDelete({ type: 'stock', id: s.id })} className="text-red-500">🗑️</button>
+                  {stock.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4 text-sm">Aucun article en stock</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {stock.map(s => (
+                        <div key={s.id} className="p-2 bg-gray-50 rounded flex justify-between items-center text-xs">
+                          <div>
+                            <div className="font-bold">{s.nom}</div>
+                            <div className={`text-xs ${s.quantite <= s.seuilAlerte ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                              Quantité: {s.quantite} {s.quantite <= s.seuilAlerte && '⚠️'}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => { setEditingItem(s); setFormData(s); setModalType('stock'); setShowAddModal(true); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️</button>
+                            <button onClick={() => setConfirmDelete({ type: 'stock', id: s.id })} className="px-2 py-1 bg-red-500 text-white rounded text-xs">🗑️</button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {view === 'notif-settings' && (
-              <div className="bg-white rounded-lg shadow p-3">
-                <h2 className="text-lg font-bold mb-3">⚙️ Paramètres Telegram</h2>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={notificationSettings.telegram.enabled} onChange={(e) => setNotificationSettings(prev => ({ ...prev, telegram: { ...prev.telegram, enabled: e.target.checked } }))} />
-                    <span>Activer Telegram</span>
-                  </label>
-                  <input type="text" placeholder="Bot Token" value={notificationSettings.telegram.botToken} onChange={(e) => setNotificationSettings(prev => ({ ...prev, telegram: { ...prev.telegram, botToken: e.target.value } }))} className="w-full p-2 border rounded text-sm" />
-                  <input type="text" placeholder="Chat ID" value={notificationSettings.telegram.chatId} onChange={(e) => setNotificationSettings(prev => ({ ...prev, telegram: { ...prev.telegram, chatId: e.target.value } }))} className="w-full p-2 border rounded text-sm" />
-                  <button onClick={() => sendTelegramNotification('Test', '✅ Ça marche !')} className="w-full px-3 py-2 bg-green-500 text-white rounded text-sm">📤 Test</button>
-                  <button onClick={() => setView('calendar')} className="w-full px-3 py-2 bg-blue-500 text-white rounded text-sm">Retour</button>
+                  )}
                 </div>
               </div>
             )}
           </div>
 
+          <div className="fixed bottom-3 right-3 flex flex-col gap-2 z-20">
+            <button onClick={() => openReservationModal()} className="w-12 h-12 bg-purple-500 text-white rounded-full shadow-lg flex items-center justify-center text-xl hover:bg-purple-600">📷</button>
+            <button onClick={() => openRdvModal()} className="w-12 h-12 bg-pink-500 text-white rounded-full shadow-lg flex items-center justify-center text-xl hover:bg-pink-600">👥</button>
+          </div>
+
+          {showDateMenu && (
+            <div
+              className="fixed bg-white rounded-lg shadow-lg p-2 z-40 text-sm"
+              style={{ left: `${showDateMenu.x}px`, top: `${showDateMenu.y}px`, transform: 'translate(-50%, -50%)' }}
+            >
+              <button onClick={() => openReservationModal(showDateMenu.date)} className="w-full px-3 py-2 text-left hover:bg-gray-100 rounded text-xs">📷 Réservation</button>
+              <button onClick={() => openRdvModal(showDateMenu.date)} className="w-full px-3 py-2 text-left hover:bg-gray-100 rounded text-xs">📅 RDV</button>
+              <button onClick={() => setShowDateMenu(null)} className="w-full px-3 py-2 text-left hover:bg-gray-100 rounded text-xs text-gray-500">✕ Annuler</button>
+            </div>
+          )}
+
           {showDateMenu && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowDateMenu(null)}></div>
-              <div className="fixed z-50 bg-white rounded-lg shadow-xl border p-2 text-sm" style={{ left: showDateMenu.x, top: showDateMenu.y }}>
-                <button onClick={() => openReservationModal(showDateMenu.date)} className="block w-full text-left px-3 py-2 hover:bg-blue-100 rounded whitespace-nowrap text-sm">📷 Nouvelle location</button>
-                <button onClick={() => openRdvModal(showDateMenu.date)} className="block w-full text-left px-3 py-2 hover:bg-green-100 rounded whitespace-nowrap text-sm">📅 Nouveau RDV</button>
-              </div>
+              <div className="fixed inset-0 z-30" onClick={() => setShowDateMenu(null)}></div>
             </>
           )}
 
@@ -876,7 +1004,10 @@
                   <div><strong>Tél:</strong> {showEventDetail.clientTel}</div>
                   {showEventDetail.type === 'reservation' && (
                     <>
-                      <div><strong>Date:</strong> {showEventDetail.dateDebut} à {showEventDetail.heureDebut}</div>
+                      <div><strong>Retrait:</strong> {showEventDetail.dateDebut} à {showEventDetail.heureDebut}</div>
+                      <div><strong>Retour:</strong> {showEventDetail.dateFin} à {showEventDetail.heureFin}</div>
+                      {showEventDetail.lieuRetrait && <div><strong>Lieu de retrait:</strong> {showEventDetail.lieuRetrait}</div>}
+                      {showEventDetail.lieuRetour && <div><strong>Lieu de retour:</strong> {showEventDetail.lieuRetour}</div>}
                       {showEventDetail.theme && <div><strong>Thème:</strong> {showEventDetail.theme}</div>}
                     </>
                   )}
@@ -937,8 +1068,21 @@
                     </select>
                     <input type="text" placeholder="Client" value={formData.clientNom || ''} onChange={(e) => setFormData({ ...formData, clientNom: e.target.value })} className="w-full p-2 border rounded text-sm" />
                     <input type="tel" placeholder="Téléphone" value={formData.clientTel || ''} onChange={(e) => setFormData({ ...formData, clientTel: e.target.value })} className="w-full p-2 border rounded text-sm" />
-                    <input type="date" value={formData.dateDebut || ''} onChange={(e) => setFormData({ ...formData, dateDebut: e.target.value })} className="w-full p-2 border rounded text-sm" />
-                    <input type="time" value={formData.heureDebut || ''} onChange={(e) => setFormData({ ...formData, heureDebut: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    
+                    <div className="border-t pt-2">
+                      <label className="block text-xs font-bold mb-1 text-blue-600">📍 RETRAIT</label>
+                      <input type="date" value={formData.dateDebut || ''} onChange={(e) => setFormData({ ...formData, dateDebut: e.target.value })} className="w-full p-2 border rounded text-sm mb-1" />
+                      <input type="time" value={formData.heureDebut || ''} onChange={(e) => setFormData({ ...formData, heureDebut: e.target.value })} className="w-full p-2 border rounded text-sm mb-1" />
+                      <input type="text" placeholder="Lieu de retrait" value={formData.lieuRetrait || ''} onChange={(e) => setFormData({ ...formData, lieuRetrait: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    </div>
+                    
+                    <div className="border-t pt-2">
+                      <label className="block text-xs font-bold mb-1 text-green-600">📍 RETOUR</label>
+                      <input type="date" value={formData.dateFin || ''} onChange={(e) => setFormData({ ...formData, dateFin: e.target.value })} className="w-full p-2 border rounded text-sm mb-1" />
+                      <input type="time" value={formData.heureFin || ''} onChange={(e) => setFormData({ ...formData, heureFin: e.target.value })} className="w-full p-2 border rounded text-sm mb-1" />
+                      <input type="text" placeholder="Lieu de retour" value={formData.lieuRetour || ''} onChange={(e) => setFormData({ ...formData, lieuRetour: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                    </div>
+                    
                     <textarea placeholder="Thème" value={formData.theme || ''} onChange={(e) => setFormData({ ...formData, theme: e.target.value })} className="w-full p-2 border rounded text-sm h-16"></textarea>
                   </div>
                 )}
@@ -976,7 +1120,7 @@
       );
     }
 
-									
+							
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/Calendrier-APP/service-worker.js')
@@ -985,13 +1129,13 @@
       });
     }
 
-								
+				
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
       
-														
+												
       const installBtn = document.createElement('button');
       installBtn.textContent = '📱 Installer';
       installBtn.className = 'fixed bottom-4 right-4 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-lg z-50 text-sm';
